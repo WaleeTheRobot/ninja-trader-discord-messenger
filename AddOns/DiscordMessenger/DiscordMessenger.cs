@@ -24,6 +24,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int Quantity { get; set; }
         public double Price { get; set; }
         public string Type { get; set; }
+        public string Action { get; set; }
     }
 
     public partial class DiscordMessenger : Strategy
@@ -56,6 +57,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Account Name", Description = "The account name used for the message.", Order = 2, GroupName = GROUP_NAME)]
         public string AccountName { get; set; }
 
+        [NinjaScriptProperty]
+        [Display(Name = "Screenshot Location", Description = "The location for the screenshot.", Order = 3, GroupName = GROUP_NAME)]
+        public string ScreenshotLocation { get; set; }
+
         #endregion
         protected override void OnStateChange()
         {
@@ -83,8 +88,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 IsInstantiatedOnEachOptimizationIteration = true;
 
                 // Properties
-                WebhookUrl = "Your Webhook URL";
+                WebhookUrl = "Your Discord Webhook URL";
                 AccountName = "Playback101";
+                ScreenshotLocation = "C:\\screenshots";
             }
             else if (State == State.Configure)
             {
@@ -154,16 +160,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     return;
                 }
 
-
-
                 for (int i = 0; i < totalPositions; i++)
                 {
                     Position currentPosition = new Position
                     {
                         Instrument = _account.Positions[i].Instrument.MasterInstrument.Name,
                         Quantity = _account.Positions[i].Quantity,
-                        AveragePrice = _account.Positions[i].AveragePrice,
-                        MarketPosition = _account.Positions[i].MarketPosition.ToString()
+                        AveragePrice = Math.Round(_account.Positions[i].AveragePrice, 2),
+                        MarketPosition = _account.Positions[i].MarketPosition.ToString(),
                     };
 
                     _positions.Add(currentPosition);
@@ -228,13 +232,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             Instrument = _account.Orders[i].Instrument.MasterInstrument.Name,
                             Quantity = _account.Orders[i].Quantity,
-                            Price = price,
-                            Type = _account.Orders[i].OrderType.ToString()
+                            Price = Math.Round(price, 2),
+                            Type = _account.Orders[i].OrderType.ToString(),
+                            Action = _account.Orders[i].OrderAction.ToString()
                         };
 
                         _orderEntries.Add(orderEntry);
                     }
                 }
+
+                // Sort descending order by price so it appears natural to the chart
+                _orderEntries = _orderEntries.OrderByDescending(order => order.Price).ToList();
             }
         }
 
@@ -248,11 +256,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     if (success)
                     {
-                        Console.WriteLine("Callback: " + message);
+                        AddEventLog("Success", "Trading Status Sent");
+                        Print(message);
                     }
                     else
                     {
-                        Console.WriteLine("Callback Error: " + message);
+                        AddEventLog("Failed", "Trading Status Sent");
+                        Print(message);
                     }
                 });
             }

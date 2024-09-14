@@ -1,56 +1,106 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Media.Imaging;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
     public partial class DiscordMessenger : Strategy
     {
         private readonly HttpClient _client = new HttpClient();
+        private BitmapFrame _outputFrame;
+        private string _screenshotName = "";
 
         private async Task SendMessageAsync(Action<bool, string> callback)
         {
+            await TakeScreenshot();
+
             var embedContent = GetEmbedContent();
 
-            var messagePayload = new
-            {
-                embeds = new[] { embedContent }
-            };
+            string filePath = Path.Combine(ScreenshotLocation, _screenshotName);
 
             // Load Newtonsoft from Ninja using reflection
             var newtonsoftJsonAssembly = Assembly.LoadFrom(@"C:\Program Files\NinjaTrader 8\bin\Newtonsoft.Json.dll");
             var jsonConvertType = newtonsoftJsonAssembly.GetType("Newtonsoft.Json.JsonConvert");
             var serializeMethod = jsonConvertType.GetMethod("SerializeObject", new[] { typeof(object) });
 
-            var jsonPayload = (string)serializeMethod.Invoke(null, new object[] { messagePayload });
-            var httpContent = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-
-            try
+            // Create the message payload with embeds
+            var messagePayload = new
             {
-                HttpResponseMessage response = await _client.PostAsync(WebhookUrl, httpContent);
+                embeds = new[] { embedContent }
+            };
+            var jsonPayload = (string)serializeMethod.Invoke(null, new object[] { messagePayload });
 
-                if (response.IsSuccessStatusCode)
+            // Retry parameters
+            int retryCount = 5;
+            int delayMilliseconds = 500;
+            bool fileExists = false;
+
+            // Retry loop to ensure the file is available
+            for (int i = 0; i < retryCount; i++)
+            {
+                if (File.Exists(filePath))
                 {
-                    Print("Message sent successfully.");
-                    callback(true, "Message sent successfully.");
+                    fileExists = true;
+                    break;
                 }
                 else
                 {
-                    Print($"Failed to send message. Status code: {response.StatusCode}");
-                    callback(false, $"Failed to send message. Status code: {response.StatusCode}");
+                    await Task.Delay(delayMilliseconds);
+                }
+            }
+
+            if (!fileExists)
+            {
+                callback(false, "Failed to send message. Screenshot file not found after retries.");
+                return;
+            }
+
+            try
+            {
+                using (var formData = new MultipartFormDataContent())
+                {
+                    var jsonContent = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+                    formData.Add(jsonContent, "payload_json");
+
+                    // Add the screenshot file
+                    var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+                    var fileContent = new StreamContent(fileStream);
+                    fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                    formData.Add(fileContent, "file", Path.GetFileName(filePath));
+
+                    // Send the POST request
+                    HttpResponseMessage response = await _client.PostAsync(WebhookUrl, formData);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        try
+                        {
+                            File.Delete(filePath);
+                            callback(true, "Message sent and file deleted successfully.");
+                        }
+                        catch (Exception deleteEx)
+                        {
+                            callback(true, $"Message sent successfully, but failed to delete file: {deleteEx.Message}");
+                        }
+                    }
+                    else
+                    {
+                        callback(false, $"Failed to send message. Status code: {response.StatusCode}");
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Print($"An error occurred: {ex.Message}");
                 callback(false, $"An error occurred: {ex.Message}");
             }
         }
-
 
         private object GetEmbedContent()
         {
@@ -113,6 +163,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         orderDetails.AppendLine($"Quantity: {order.Quantity}");
                         orderDetails.AppendLine($"Price: {order.Price}");
+                        orderDetails.AppendLine($"Action: {order.Action}");
                         orderDetails.AppendLine($"Type: {order.Type}");
                         orderDetails.AppendLine("");
                     }
@@ -129,5 +180,36 @@ namespace NinjaTrader.NinjaScript.Strategies
             return embed;
         }
 
+        private async Task TakeScreenshot()
+        {
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (_chartWindow != null)
+                {
+                    RenderTargetBitmap screenCapture = _chartWindow.GetScreenshot(ShareScreenshotType.Chart);
+                    _outputFrame = BitmapFrame.Create(screenCapture);
+
+                    _screenshotName = $"{DateTime.Now:yyyyMMddHHmmss}.png";
+
+                    if (!Directory.Exists(ScreenshotLocation))
+                    {
+                        Directory.CreateDirectory(ScreenshotLocation);
+                    }
+
+                    if (screenCapture != null)
+                    {
+                        PngBitmapEncoder png = new PngBitmapEncoder();
+                        png.Frames.Add(_outputFrame);
+
+                        using (Stream stream = File.Create(Path.Combine(ScreenshotLocation, _screenshotName)))
+                        {
+                            png.Save(stream);
+                        }
+
+                        Print("Screenshot saved to " + Path.Combine(ScreenshotLocation, _screenshotName));
+                    }
+                }
+            });
+        }
     }
 }
