@@ -14,6 +14,10 @@ You will need to add this as a strategy in NinjaTrader. Note that the strategy w
 
 Screenshot - Will only take the screenshot of the last chart that had an updated order. For example, it will send the screenshot of ES if you are trading NQ with Discord Messenger on it and then select a chart with ES for a new position.
 
+# Developing/Usage
+
+You'll find the Discord Messenger under the strategies. Enable it similar to how you will enable a strategy. Make sure to update the `Account Name` to the account you want to use to send the messages.
+
 For developing, you can copy the DiscordMessenger folder into your local NinjaTrader AddOns folder.
 
 For usage, you can download the zip containing the word import in the release page. You can import this zip file similar to importing a normal NinjaTrader Add-On. https://github.com/WaleeTheRobot/ninja-trader-discord-messenger/releases
