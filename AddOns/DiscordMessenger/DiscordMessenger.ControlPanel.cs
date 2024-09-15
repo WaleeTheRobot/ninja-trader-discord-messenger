@@ -1,13 +1,15 @@
 #region Using declarations
+using NinjaTrader.Custom.AddOns.DiscordMessenger;
 using NinjaTrader.Gui.Chart;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using Colors = NinjaTrader.Custom.AddOns.DiscordMessenger.Colors;
 #endregion
 
 namespace NinjaTrader.NinjaScript.Strategies
@@ -19,7 +21,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         public string Message { get; set; }
     }
 
-    // TODO: WIP
     public partial class DiscordMessenger : Strategy
     {
         private ChartTab _chartTab;
@@ -29,9 +30,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private TabItem _tabItem;
 
         private List<EventLog> _eventLogs = new List<EventLog>();
-        private bool _webhookStatus = false;
         private Ellipse _statusCircle;
         private Label _eventLogsListlabel;
+
+        private Button _tradingStatusButton, _screenshotButton;
 
         private void ControlPanelSetStateDataLoaded()
         {
@@ -55,9 +57,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private SolidColorBrush GetSolidColorBrushFromHex(string hexColor)
+        private void UpdateControlPanelUi(bool statusAlive)
         {
-            return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hexColor));
+            if (ChartControl != null)
+            {
+                ChartControl.Dispatcher.InvokeAsync(() =>
+                {
+                    UpdateStatusCircle(statusAlive);
+                    UpdateButtons(statusAlive);
+                });
+            }
         }
 
         private void CreateWPFControls()
@@ -89,7 +98,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             _mainGrid = new Grid
             {
                 Margin = new Thickness(0, 60, 0, 0),
-                Background = GetSolidColorBrushFromHex("#2C2C34")
+                Background = Utils.GetSolidColorBrushFromHex(Colors.MainGridBgColor)
             };
 
             // Define row and column structure
@@ -100,7 +109,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             _mainGrid.ColumnDefinitions.Add(new ColumnDefinition());
             _mainGrid.ColumnDefinitions.Add(new ColumnDefinition());
 
-            // Discord Webhook Status Row
+            AddWebhookStatus();
+            AddButtons();
+            AddRecentEvents();
+
+            if (TabSelected()) InsertWPFControls();
+
+            _chartWindow.MainTabControl.SelectionChanged += TabChangedHandler;
+        }
+
+        #region Webhook Status
+
+        private void AddWebhookStatus()
+        {
             StackPanel statusPanel = new StackPanel
             {
                 Margin = new Thickness(4),
@@ -113,14 +134,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Width = 15,
                 Height = 15,
-                Fill = new SolidColorBrush(Colors.Red),
+                Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(Colors.StatusFailed)),
                 Margin = new Thickness(0, 0, 10, 0)
             };
 
             TextBlock statusText = new TextBlock
             {
                 Text = "Discord Webhook Status",
-                Foreground = GetSolidColorBrushFromHex("#E7E7E7"),
+                Foreground = Utils.GetSolidColorBrushFromHex(Colors.TextColor),
                 VerticalAlignment = VerticalAlignment.Center
             };
 
@@ -130,28 +151,32 @@ namespace NinjaTrader.NinjaScript.Strategies
             Grid.SetRow(statusPanel, 0);
             Grid.SetColumnSpan(statusPanel, 2);
             _mainGrid.Children.Add(statusPanel);
+        }
 
-            // Trading Status button
-            Button tradingStatusButton = GetButton("Trading Status", "#5C64F2", "#4F75FF", "#FFFFFF");
+        private void UpdateStatusCircle(bool statusAlive)
+        {
+            if (statusAlive)
+            {
+                _statusCircle.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(Colors.StatusSuccess));
+            }
+            else
+            {
+                _statusCircle.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(Colors.StatusFailed));
+            }
+        }
 
-            Grid.SetRow(tradingStatusButton, 1);
-            Grid.SetColumnSpan(tradingStatusButton, 2);
-            _mainGrid.Children.Add(tradingStatusButton);
+        #endregion
 
-            // Send Screenshot button
-            Button sendScreenshotButton = GetButton("Send Screenshot", "#5C64F2", "#4F75FF", "#FFFFFF");
-            sendScreenshotButton.Click += SendScreenshotButtonClick;
+        #region Recent Events
 
-            Grid.SetRow(sendScreenshotButton, 2);
-            Grid.SetColumnSpan(sendScreenshotButton, 2);
-            _mainGrid.Children.Add(sendScreenshotButton);
-
+        private void AddRecentEvents()
+        {
             // Event Label
             TextBlock eventLabel = new TextBlock
             {
                 Text = "Recent Events",
                 FontSize = 14,
-                Foreground = GetSolidColorBrushFromHex("#E7E7E7"),
+                Foreground = Utils.GetSolidColorBrushFromHex(Colors.TextColor),
                 FontWeight = FontWeights.Bold,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(4, 10, 0, 0)
@@ -166,7 +191,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Content = "",
                 FontSize = 10,
-                Foreground = GetSolidColorBrushFromHex("#E7E7E7"),
+                Foreground = Utils.GetSolidColorBrushFromHex(Colors.TextColor),
                 VerticalAlignment = VerticalAlignment.Top,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Margin = new Thickness(0, 4, 0, 0),
@@ -180,20 +205,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             Grid.SetRow(_eventLogsListlabel, 4);
             Grid.SetColumnSpan(_eventLogsListlabel, 2);
             _mainGrid.Children.Add(_eventLogsListlabel);
-
-            if (TabSelected()) InsertWPFControls();
-
-            _chartWindow.MainTabControl.SelectionChanged += TabChangedHandler;
-
-            UpdateStatusCircle();
         }
 
-        private void SendScreenshotButtonClick(object sender, RoutedEventArgs e)
-        {
-            //TakeScreenshot();
-        }
-
-        public void AddEventLog(string status, string eventMessage)
+        private void AddEventLog(string status, string eventMessage)
         {
             var dateTime = DateTime.Now;
 
@@ -203,8 +217,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Status = status,
                 Message = eventMessage
             });
-
-            Print(string.Format("{0} {1} {2}", dateTime, status, eventMessage));
 
             // Limit
             if (_eventLogs.Count > 5)
@@ -229,87 +241,70 @@ namespace NinjaTrader.NinjaScript.Strategies
             });
         }
 
-        #region Status
-
-        private void UpdateStatusCircle()
-        {
-            if (_webhookStatus)
-            {
-                _statusCircle.Fill = new SolidColorBrush(Colors.Green);
-            }
-            else
-            {
-                _statusCircle.Fill = new SolidColorBrush(Colors.Red);
-            }
-        }
-
         #endregion
 
         #region Buttons
 
-        private Button GetButton(string content, string hexBgColor, string hexBgColorHover, string hexTextColor)
+        private void AddButtons()
         {
-            Style customButtonStyle = CreateCustomButtonStyle(hexBgColor, hexBgColorHover);
-
-            Button button = new Button
+            // Trading Status button
+            _tradingStatusButton = ButtonUtils.GetButton(new ButtonConfig
             {
-                Content = content,
-                FontSize = 18,
-                Visibility = Visibility.Visible,
-                Foreground = GetSolidColorBrushFromHex(hexTextColor),
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch,
-                Style = customButtonStyle
-            };
+                Content = "Trading Status Enabled",
+                BackgroundColor = Colors.ButtonBgColor,
+                HoverBackgroundColor = Colors.ButtonHoverBgColor,
+                TextColor = Colors.TextColor,
+                ClickHandler = (Action<object, RoutedEventArgs>)TradingStatusButtonClick
+            });
+            _tradingStatusButton.IsEnabled = false;
+            ButtonUtils.UpdateButtonState(_tradingStatusButton, false);
 
-            return button;
+            Grid.SetRow(_tradingStatusButton, 1);
+            Grid.SetColumnSpan(_tradingStatusButton, 2);
+            _mainGrid.Children.Add(_tradingStatusButton);
+
+            // Send Screenshot button
+            _screenshotButton = ButtonUtils.GetButton(new ButtonConfig
+            {
+                Content = "Send Screenshot",
+                BackgroundColor = Colors.ButtonBgColor,
+                HoverBackgroundColor = Colors.ButtonHoverBgColor,
+                TextColor = Colors.TextColor,
+                ClickHandler = (Func<object, RoutedEventArgs, Task>)SendScreenshotButtonClickAsync
+            });
+            _screenshotButton.IsEnabled = false;
+            ButtonUtils.UpdateButtonState(_screenshotButton, false);
+
+            Grid.SetRow(_screenshotButton, 2);
+            Grid.SetColumnSpan(_screenshotButton, 2);
+            _mainGrid.Children.Add(_screenshotButton);
         }
 
-        public Style CreateCustomButtonStyle(string hexBgColor, string hexBgColorHover)
+        private void UpdateButtons(bool statusAlive)
         {
-            Style style = new Style(typeof(Button));
+            ButtonUtils.UpdateButtonState(_tradingStatusButton, statusAlive);
+            ButtonUtils.UpdateButtonState(_screenshotButton, statusAlive);
+        }
 
-            ControlTemplate template = new ControlTemplate(typeof(Button));
+        private void TradingStatusButtonClick(object sender, RoutedEventArgs e)
+        {
+            Print("Trading Status button clicked!");
+        }
 
-            // Create a Border as the root element
-            FrameworkElementFactory border = new FrameworkElementFactory(typeof(Border));
-            border.SetBinding(Border.BackgroundProperty, new Binding("Background") { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
-            border.SetBinding(Border.BorderBrushProperty, new Binding("BorderBrush") { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
-            border.SetBinding(Border.BorderThicknessProperty, new Binding("BorderThickness") { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
-
-            // Bind the Button's Padding to the Border's Padding
-            border.SetBinding(Border.PaddingProperty, new Binding("Padding") { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
-
-            // Add ContentPresenter inside the Border
-            FrameworkElementFactory contentPresenter = new FrameworkElementFactory(typeof(ContentPresenter));
-            contentPresenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-            contentPresenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
-            border.AppendChild(contentPresenter);
-
-            template.VisualTree = border;
-
-            // Define triggers for different states
-            Trigger mouseover = new Trigger { Property = Button.IsMouseOverProperty, Value = true };
-            mouseover.Setters.Add(new Setter(Button.BackgroundProperty, GetSolidColorBrushFromHex(hexBgColorHover)));
-
-            Trigger pressed = new Trigger { Property = Button.IsPressedProperty, Value = true };
-            pressed.Setters.Add(new Setter(Button.BackgroundProperty, GetSolidColorBrushFromHex(hexBgColorHover)));
-
-            style.Triggers.Add(mouseover);
-            style.Triggers.Add(pressed);
-
-            // Set the template
-            style.Setters.Add(new Setter(Button.TemplateProperty, template));
-
-            // Set default property values
-            style.Setters.Add(new Setter(Button.BackgroundProperty, GetSolidColorBrushFromHex(hexBgColor)));
-            style.Setters.Add(new Setter(Button.BorderBrushProperty, Brushes.Transparent));
-            style.Setters.Add(new Setter(Button.BorderThicknessProperty, new Thickness(0)));
-
-            style.Setters.Add(new Setter(Button.PaddingProperty, new Thickness(3)));
-            style.Setters.Add(new Setter(Button.MarginProperty, new Thickness(3)));
-
-            return style;
+        private async Task SendScreenshotButtonClickAsync(object sender, RoutedEventArgs e)
+        {
+            await SendScreenshotAsync((success, message) =>
+            {
+                if (success)
+                {
+                    AddEventLog("Success", "Screenshot Sent");
+                }
+                else
+                {
+                    AddEventLog("Failed", "Screenshot Sent");
+                    Print(message);
+                }
+            });
         }
 
         #endregion

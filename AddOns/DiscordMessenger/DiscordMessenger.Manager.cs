@@ -7,6 +7,7 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace NinjaTrader.NinjaScript.Strategies
@@ -16,19 +17,32 @@ namespace NinjaTrader.NinjaScript.Strategies
         private readonly HttpClient _client = new HttpClient();
         private BitmapFrame _outputFrame;
         private string _screenshotName = "";
+        private int _finalEmbededColor;
+
+        private Assembly _newtonsoftJsonAssembly;
+        private Type _jsonConvertType;
+
+        private void ConfigureMessengerManager()
+        {
+            var solidColorBrush = EmbededColor as SolidColorBrush;
+            if (solidColorBrush != null)
+            {
+                var color = solidColorBrush.Color;
+                _finalEmbededColor = (color.R << 16) | (color.G << 8) | color.B;
+            }
+
+            // Load Newtonsoft from Ninja using reflection
+            _newtonsoftJsonAssembly = Assembly.LoadFrom(@"C:\Program Files\NinjaTrader 8\bin\Newtonsoft.Json.dll");
+            _jsonConvertType = _newtonsoftJsonAssembly.GetType("Newtonsoft.Json.JsonConvert");
+        }
 
         private async Task SendMessageAsync(Action<bool, string> callback)
         {
             await TakeScreenshot();
 
             var embedContent = GetEmbedContent();
-
             string filePath = Path.Combine(ScreenshotLocation, _screenshotName);
-
-            // Load Newtonsoft from Ninja using reflection
-            var newtonsoftJsonAssembly = Assembly.LoadFrom(@"C:\Program Files\NinjaTrader 8\bin\Newtonsoft.Json.dll");
-            var jsonConvertType = newtonsoftJsonAssembly.GetType("Newtonsoft.Json.JsonConvert");
-            var serializeMethod = jsonConvertType.GetMethod("SerializeObject", new[] { typeof(object) });
+            var serializeMethod = _jsonConvertType.GetMethod("SerializeObject", new[] { typeof(object) });
 
             // Create the message payload with embeds
             var messagePayload = new
@@ -37,45 +51,62 @@ namespace NinjaTrader.NinjaScript.Strategies
             };
             var jsonPayload = (string)serializeMethod.Invoke(null, new object[] { messagePayload });
 
-            // Retry parameters
-            int retryCount = 5;
-            int delayMilliseconds = 500;
-            bool fileExists = false;
-
-            // Retry loop to ensure the file is available
-            for (int i = 0; i < retryCount; i++)
-            {
-                if (File.Exists(filePath))
-                {
-                    fileExists = true;
-                    break;
-                }
-                else
-                {
-                    await Task.Delay(delayMilliseconds);
-                }
-            }
-
-            if (!fileExists)
+            // Ensure the file exists before sending
+            if (!await EnsureFileExists(filePath))
             {
                 callback(false, "Failed to send message. Screenshot file not found after retries.");
                 return;
             }
 
+            await SendHttpRequestAsync(filePath, jsonPayload, callback);
+        }
+
+        private async Task SendScreenshotAsync(Action<bool, string> callback)
+        {
+            await TakeScreenshot();
+
+            string filePath = Path.Combine(ScreenshotLocation, _screenshotName);
+
+            // Ensure the file exists before sending
+            if (!await EnsureFileExists(filePath))
+            {
+                callback(false, "Failed to send screenshot. File not found after retries.");
+                return;
+            }
+
+            await SendHttpRequestAsync(filePath, null, callback);
+        }
+
+        private async Task<bool> EnsureFileExists(string filePath, int retryCount = 5, int delayMilliseconds = 500)
+        {
+            for (int i = 0; i < retryCount; i++)
+            {
+                if (File.Exists(filePath))
+                {
+                    return true;
+                }
+                await Task.Delay(delayMilliseconds);
+            }
+            return false;
+        }
+
+        private async Task SendHttpRequestAsync(string filePath, string jsonPayload, Action<bool, string> callback)
+        {
             try
             {
                 using (var formData = new MultipartFormDataContent())
                 {
-                    var jsonContent = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-                    formData.Add(jsonContent, "payload_json");
+                    if (!string.IsNullOrEmpty(jsonPayload))
+                    {
+                        var jsonContent = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+                        formData.Add(jsonContent, "payload_json");
+                    }
 
-                    // Add the screenshot file
                     var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
                     var fileContent = new StreamContent(fileStream);
                     fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                     formData.Add(fileContent, "file", Path.GetFileName(filePath));
 
-                    // Send the POST request
                     HttpResponseMessage response = await _client.PostAsync(WebhookUrl, formData);
 
                     if (response.IsSuccessStatusCode)
@@ -83,16 +114,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                         try
                         {
                             File.Delete(filePath);
-                            callback(true, "Message sent and file deleted successfully.");
+                            callback(true, "Screenshot sent and file deleted successfully.");
                         }
                         catch (Exception deleteEx)
                         {
-                            callback(true, $"Message sent successfully, but failed to delete file: {deleteEx.Message}");
+                            callback(true, $"Screenshot sent successfully, but failed to delete file: {deleteEx.Message}");
                         }
                     }
                     else
                     {
-                        callback(false, $"Failed to send message. Status code: {response.StatusCode}");
+                        callback(false, $"Failed to send screenshot. Status code: {response.StatusCode}");
                     }
                 }
             }
@@ -107,7 +138,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             var embed = new
             {
                 title = "Trading Status",
-                color = 3447003, // TODO: allow user to change this
+                color = _finalEmbededColor,
                 fields = new List<object>()
             };
 
@@ -116,7 +147,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 embed.fields.Add(new
                 {
-                    name = "Positions",
+                    name = "**Positions**",
                     value = "No Positions",
                     inline = false
                 });
@@ -148,7 +179,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 embed.fields.Add(new
                 {
-                    name = "Active Orders",
+                    name = "**Active Orders**",
                     value = "No Active Orders",
                     inline = false
                 });
@@ -205,8 +236,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             png.Save(stream);
                         }
-
-                        Print("Screenshot saved to " + Path.Combine(ScreenshotLocation, _screenshotName));
                     }
                 }
             });

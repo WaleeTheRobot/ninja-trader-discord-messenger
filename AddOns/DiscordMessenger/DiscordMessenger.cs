@@ -1,10 +1,15 @@
 #region Using declarations
 using NinjaTrader.Cbi;
+using NinjaTrader.Gui;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using System.Net.Http;
+using System.Threading;
+using System.Windows.Media;
+using System.Xml.Serialization;
 #endregion
 
 //This namespace holds Strategies in this folder and is required. Do not change it. 
@@ -37,6 +42,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool _orderUpdateTriggered;
         private bool _positionUpdateTriggered;
         private bool _sendMessage;
+        private bool _initialCheck;
+
+        private Brush _embededColor;
+
+        private Timer _timer;
+        private HttpClient _webhookStatusClient;
 
         #region Properties
 
@@ -45,7 +56,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [ReadOnly(true)]
         public string Version
         {
-            get { return "0.0.0"; }
+            get { return "1.0.0"; }
             set { }
         }
 
@@ -61,7 +72,24 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Screenshot Location", Description = "The location for the screenshot.", Order = 3, GroupName = GROUP_NAME)]
         public string ScreenshotLocation { get; set; }
 
+        [NinjaScriptProperty]
+        [XmlIgnore]
+        [Display(Name = "Embeded Color", Description = "The color for the embeded Discord message.", Order = 4, GroupName = GROUP_NAME)]
+        public Brush EmbededColor
+        {
+            get { return _embededColor; }
+            set { _embededColor = value; }
+        }
+
+        [Browsable(false)]
+        public string EmbededColorSerialize
+        {
+            get { return Serialize.BrushToString(_embededColor); }
+            set { _embededColor = Serialize.StringToBrush(value); }
+        }
+
         #endregion
+
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
@@ -88,9 +116,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 IsInstantiatedOnEachOptimizationIteration = true;
 
                 // Properties
-                WebhookUrl = "Your Discord Webhook URL";
-                AccountName = "Playback101";
+                WebhookUrl = "";
+                AccountName = "Sim101";
                 ScreenshotLocation = "C:\\screenshots";
+                EmbededColor = Brushes.DodgerBlue;
             }
             else if (State == State.Configure)
             {
@@ -99,12 +128,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _orderUpdateTriggered = true;
                 _positionUpdateTriggered = true;
                 _sendMessage = false;
+                _initialCheck = true;
+                _webhookStatusClient = new HttpClient();
                 _account = Account.All.FirstOrDefault(a => a.Name == AccountName);
 
                 if (_account != null)
                 {
-                    Print("Account found: " + _account.Name);
-
                     _account.OrderUpdate += OnOrderUpdate;
                     _account.PositionUpdate += OnPositionUpdate;
                 }
@@ -112,6 +141,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     Print("Account not found");
                 }
+
+                ConfigureMessengerManager();
             }
             else if (State == State.DataLoaded)
             {
@@ -120,6 +151,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             else if (State == State.Terminated)
             {
                 ControlPanelSetStateTerminated();
+                StopWebhookChecker();
+            }
+            else if (State == State.Realtime)
+            {
+                StartWebhookChecker();
             }
         }
 
@@ -205,7 +241,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // Check for proper price for limit order since order may have a price for both
                     if (
                         _account.Orders[i].OrderType == OrderType.StopLimit ||
-                        _account.Orders[i].OrderType == OrderType.StopMarket
+                        _account.Orders[i].OrderType == OrderType.StopMarket ||
+                        _account.Orders[i].OrderType == OrderType.MIT
                     )
                     {
                         price = _account.Orders[i].StopPrice;
@@ -248,6 +285,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void CheckSendMessage()
         {
+            if (State != State.Realtime)
+            {
+                return;
+            }
+
+            if (_initialCheck)
+            {
+                _initialCheck = false;
+
+                // Don't send message on initial strategy load if no positions and active orders
+                if (_positions.Count == 0 && _orderEntries.Count == 0)
+                {
+                    _sendMessage = false;
+                    return;
+                }
+            }
+
             if (_sendMessage)
             {
                 _sendMessage = false;
@@ -257,7 +311,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (success)
                     {
                         AddEventLog("Success", "Trading Status Sent");
-                        Print(message);
                     }
                     else
                     {
@@ -267,5 +320,41 @@ namespace NinjaTrader.NinjaScript.Strategies
                 });
             }
         }
+
+        #region Webhook Checker
+
+        private void StartWebhookChecker()
+        {
+            _timer = new Timer(CheckWebhookStatus, null, 0, 60000);
+        }
+
+        private void StopWebhookChecker()
+        {
+            _timer?.Dispose();
+            _webhookStatusClient?.Dispose();
+        }
+
+        private async void CheckWebhookStatus(object state)
+        {
+            try
+            {
+                HttpResponseMessage response = await _webhookStatusClient.GetAsync(WebhookUrl);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                {
+                    UpdateControlPanelUi(true);
+                }
+                else
+                {
+                    UpdateControlPanelUi(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                UpdateControlPanelUi(false);
+            }
+        }
+
+        #endregion
     }
 }
