@@ -14,6 +14,10 @@ You will need to add this as a strategy in NinjaTrader. Note that the strategy w
 
 Screenshot - Will only take the screenshot of the last chart that had an updated order. For example, it will send the screenshot of ES if you are trading NQ with Discord Messenger on it and then select a chart with ES for a new position.
 
+For developing, you can copy the DiscordMessenger folder into your local NinjaTrader AddOns folder.
+
+For usage, you can download the zip containing the word import in the release page. You can import this zip file similar to importing a normal NinjaTrader Add-On. https://github.com/WaleeTheRobot/ninja-trader-discord-messenger/releases
+
 # Issues
 
 Sometimes NinjaTrader will complain about an import failed. You can just open the zip file from the release and copy the DiscordMessenger folder into the AddOns folder on your computer after removing the previous DiscordMessenger folder if it exists. It's normally located at: `C:\Users\<username>\Documents\NinjaTrader 8\bin\Custom\AddOns`. Afterwards, open NinjaTrader and click `New` > `NinjaScript Editor`. Click the NinjaScript Editor and press `F5`. It'll take a few seconds and you'll hear a sound. The icon at the bottom left corner of it will disappear when it's done compiling. Close the NinjaScript Editor and you should be good to go.
