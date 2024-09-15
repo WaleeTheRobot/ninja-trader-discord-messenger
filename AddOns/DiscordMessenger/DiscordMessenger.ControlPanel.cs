@@ -250,14 +250,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             // Trading Status button
             _tradingStatusButton = ButtonUtils.GetButton(new ButtonConfig
             {
-                Content = "Trading Status Enabled",
+                Content = "Trading Status Disabled",
+                ToggledContent = "Trading Status Enabled",
                 BackgroundColor = Colors.ButtonBgColor,
                 HoverBackgroundColor = Colors.ButtonHoverBgColor,
+                ToggledBackgroundColor = Colors.ButtonToggledBgColor,
                 TextColor = Colors.TextColor,
-                ClickHandler = (Action<object, RoutedEventArgs>)TradingStatusButtonClick
+                ClickHandler = (Action<object, RoutedEventArgs>)TradingStatusButtonClick,
+                IsToggleable = true,
+                // Start in the toggled "Enabled" state
+                InitialToggleState = true
             });
-            _tradingStatusButton.IsEnabled = false;
-            ButtonUtils.UpdateButtonState(_tradingStatusButton, false);
 
             Grid.SetRow(_tradingStatusButton, 1);
             Grid.SetColumnSpan(_tradingStatusButton, 2);
@@ -270,14 +273,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 BackgroundColor = Colors.ButtonBgColor,
                 HoverBackgroundColor = Colors.ButtonHoverBgColor,
                 TextColor = Colors.TextColor,
-                ClickHandler = (Func<object, RoutedEventArgs, Task>)SendScreenshotButtonClickAsync
+                ClickHandler = (Func<object, RoutedEventArgs, Task>)SendScreenshotButtonClickAsync,
+                IsToggleable = false
             });
-            _screenshotButton.IsEnabled = false;
-            ButtonUtils.UpdateButtonState(_screenshotButton, false);
 
             Grid.SetRow(_screenshotButton, 2);
             Grid.SetColumnSpan(_screenshotButton, 2);
             _mainGrid.Children.Add(_screenshotButton);
+
+            // Initially disable buttons
+            UpdateButtons(false);
         }
 
         private void UpdateButtons(bool statusAlive)
@@ -288,7 +293,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void TradingStatusButtonClick(object sender, RoutedEventArgs e)
         {
-            Print("Trading Status button clicked!");
+            Button button = (Button)sender;
+            ButtonState state = (ButtonState)button.Tag;
+
+            _tradingStatusDisabled = !state.IsToggled;
         }
 
         private async Task SendScreenshotButtonClickAsync(object sender, RoutedEventArgs e)

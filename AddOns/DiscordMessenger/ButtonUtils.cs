@@ -10,39 +10,57 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
     public class ButtonConfig
     {
         public string Content { get; set; }
+        public string ToggledContent { get; set; }
         public string BackgroundColor { get; set; }
         public string HoverBackgroundColor { get; set; }
+        public string ToggledBackgroundColor { get; set; }
         public string TextColor { get; set; }
         public Delegate ClickHandler { get; set; }
+        public bool IsToggleable { get; set; }
+        public bool InitialToggleState { get; set; }
+    }
+
+    public class ButtonState
+    {
+        public bool IsToggled { get; set; }
+        public ButtonConfig Config { get; set; }
     }
 
     public static class ButtonUtils
     {
         public static Button GetButton(ButtonConfig config)
         {
-            Style customButtonStyle = CreateCustomButtonStyle(config.BackgroundColor, config.HoverBackgroundColor);
-
             Button button = new Button
             {
-                Content = config.Content,
+                Content = config.IsToggleable && config.InitialToggleState ? config.ToggledContent : config.Content,
                 FontSize = 16,
                 Visibility = Visibility.Visible,
                 Foreground = Utils.GetSolidColorBrushFromHex(config.TextColor),
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch,
-                Style = customButtonStyle
+                Tag = new ButtonState { IsToggled = config.IsToggleable && config.InitialToggleState, Config = config },
+                Background = Utils.GetSolidColorBrushFromHex(config.BackgroundColor),
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(3),
+                Margin = new Thickness(3)
             };
+
+            button.Style = CreateCustomButtonStyle(button);
 
             if (config.ClickHandler != null)
             {
                 button.Click += async (sender, e) =>
                 {
-                    // Check if the handler is a synchronous Action
+                    if (config.IsToggleable)
+                    {
+                        ToggleButton(button);
+                    }
+
                     if (config.ClickHandler is Action<object, RoutedEventArgs> syncHandler)
                     {
                         syncHandler(sender, e);
                     }
-                    // Check if the handler is an asynchronous Func
                     else if (config.ClickHandler is Func<object, RoutedEventArgs, Task> asyncHandler)
                     {
                         await asyncHandler(sender, e);
@@ -50,16 +68,53 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
                 };
             }
 
-            // Add an event handler for the IsEnabledChanged event
             button.IsEnabledChanged += (sender, e) => UpdateButtonState(button, button.IsEnabled);
+            button.MouseEnter += (sender, e) => button.Background = Utils.GetSolidColorBrushFromHex(config.HoverBackgroundColor);
+            button.MouseLeave += (sender, e) => UpdateButtonState(button, button.IsEnabled);
+
+            UpdateButtonState(button, false);
 
             return button;
         }
 
-        public static Style CreateCustomButtonStyle(string hexBgColor, string hexBgColorHover)
+        private static Style CreateCustomButtonStyle(Button button)
         {
             Style style = new Style(typeof(Button));
 
+            var config = ((ButtonState)button.Tag).Config;
+
+            style.Setters.Add(new Setter(Button.TemplateProperty, CreateButtonTemplate()));
+
+            style.Triggers.Add(new Trigger
+            {
+                Property = Button.IsMouseOverProperty,
+                Value = true,
+                Setters = { new Setter(Button.BackgroundProperty, Utils.GetSolidColorBrushFromHex(config.HoverBackgroundColor)) }
+            });
+
+            style.Triggers.Add(new Trigger
+            {
+                Property = Button.IsPressedProperty,
+                Value = true,
+                Setters = { new Setter(Button.BackgroundProperty, Utils.GetSolidColorBrushFromHex(config.HoverBackgroundColor)) }
+            });
+
+            style.Triggers.Add(new Trigger
+            {
+                Property = Button.IsEnabledProperty,
+                Value = false,
+                Setters =
+                {
+                    new Setter(Button.BackgroundProperty, Utils.GetSolidColorBrushFromHex(Colors.ButtonDisabledBgColor)),
+                    new Setter(Button.OpacityProperty, 0.5)
+                }
+            });
+
+            return style;
+        }
+
+        private static ControlTemplate CreateButtonTemplate()
+        {
             ControlTemplate template = new ControlTemplate(typeof(Button));
 
             FrameworkElementFactory border = new FrameworkElementFactory(typeof(Border));
@@ -75,40 +130,29 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
 
             template.VisualTree = border;
 
-            // Define triggers for different states
-            Trigger mouseover = new Trigger { Property = Button.IsMouseOverProperty, Value = true };
-            mouseover.Setters.Add(new Setter(Button.BackgroundProperty, Utils.GetSolidColorBrushFromHex(hexBgColorHover)));
-
-            Trigger pressed = new Trigger { Property = Button.IsPressedProperty, Value = true };
-            pressed.Setters.Add(new Setter(Button.BackgroundProperty, Utils.GetSolidColorBrushFromHex(hexBgColorHover)));
-
-            Trigger disabledTrigger = new Trigger { Property = Button.IsEnabledProperty, Value = false };
-            disabledTrigger.Setters.Add(new Setter(Button.BackgroundProperty, Utils.GetSolidColorBrushFromHex(Colors.ButtonDisabledBgColor)));
-            disabledTrigger.Setters.Add(new Setter(Button.OpacityProperty, 0.5));
-
-            // Add triggers to the template
-            template.Triggers.Add(mouseover);
-            template.Triggers.Add(pressed);
-            template.Triggers.Add(disabledTrigger);
-
-            // Set the template
-            style.Setters.Add(new Setter(Button.TemplateProperty, template));
-
-            // Set default property values
-            style.Setters.Add(new Setter(Button.BackgroundProperty, Utils.GetSolidColorBrushFromHex(hexBgColor)));
-            style.Setters.Add(new Setter(Button.BorderBrushProperty, Brushes.Transparent));
-            style.Setters.Add(new Setter(Button.BorderThicknessProperty, new Thickness(0)));
-            style.Setters.Add(new Setter(Button.PaddingProperty, new Thickness(3)));
-            style.Setters.Add(new Setter(Button.MarginProperty, new Thickness(3)));
-
-            return style;
+            return template;
         }
 
         public static void UpdateButtonState(Button button, bool isEnabled)
         {
+            var state = (ButtonState)button.Tag;
+            var config = state.Config;
+
             if (isEnabled)
             {
-                button.Background = Utils.GetSolidColorBrushFromHex(Colors.ButtonBgColor);
+                if (config.IsToggleable)
+                {
+                    // Toggled is enabling
+                    button.Background = Utils.GetSolidColorBrushFromHex(state.IsToggled ? config.BackgroundColor : config.ToggledBackgroundColor);
+                    button.Content = state.IsToggled && config.IsToggleable ? config.ToggledContent : config.Content;
+                }
+                else
+                {
+                    button.Background = Utils.GetSolidColorBrushFromHex(config.BackgroundColor);
+                    button.Content = state.IsToggled && config.IsToggleable ? config.ToggledContent : config.Content;
+                }
+
+
                 button.Opacity = 1;
             }
             else
@@ -118,6 +162,13 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
             }
 
             button.IsEnabled = isEnabled;
+        }
+
+        private static void ToggleButton(Button button)
+        {
+            var state = (ButtonState)button.Tag;
+            state.IsToggled = !state.IsToggled;
+            UpdateButtonState(button, button.IsEnabled);
         }
     }
 }

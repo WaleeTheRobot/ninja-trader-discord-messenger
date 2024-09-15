@@ -43,6 +43,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool _positionUpdateTriggered;
         private bool _sendMessage;
         private bool _initialCheck;
+        private bool _tradingStatusDisabled;
 
         private Brush _embededColor;
 
@@ -129,6 +130,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _positionUpdateTriggered = true;
                 _sendMessage = false;
                 _initialCheck = true;
+                _tradingStatusDisabled = false;
                 _webhookStatusClient = new HttpClient();
                 _account = Account.All.FirstOrDefault(a => a.Name == AccountName);
 
@@ -176,6 +178,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnBarUpdate()
         {
+            if (_tradingStatusDisabled)
+            {
+                // Prevent message from being sent if toggled from disabled to enabled
+                _positionUpdateTriggered = false;
+                _orderUpdateTriggered = false;
+
+                return;
+            }
+
             CheckPositions();
             CheckOrders();
             CheckSendMessage();
