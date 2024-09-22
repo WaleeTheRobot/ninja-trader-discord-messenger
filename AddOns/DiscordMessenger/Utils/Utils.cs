@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Windows.Media;
 
-namespace NinjaTrader.Custom.AddOns.DiscordMessenger
+namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Utils
 {
     public static class Utils
     {

@@ -10,17 +10,23 @@ Make sure you have a valid Discord webhook url, which can be setup in the settin
 
 The trading status will only send if you have real-time data. For example, using live data and the playback for Market Replay.
 
-You will need to add this as a strategy in NinjaTrader. Note that the strategy will be disabled if you click the `Close` button on the Chart Trader.
+You will need to add this as an indicator in NinjaTrader.
 
 Screenshot - Will only take the screenshot of the last chart that had an updated order. For example, it will send the screenshot of ES if you are trading NQ with Discord Messenger on it and then select a chart with ES for a new position.
 
-# Developing/Usage
+# Usage
 
-You'll find the Discord Messenger under the strategies. Enable it similar to how you will enable a strategy. Make sure to update the `Account Name` to the account you want to use to send the messages.
+You'll find the Discord Messenger under the indicators. Enable it similar to how you will enable an indicator. Make sure to update the `Account Name` to the account you want to use to send the messages.
+
+For usage, you can download the zip containing the word import in the release page. You can import this zip file similar to importing a normal NinjaTrader Add-On. https://github.com/WaleeTheRobot/ninja-trader-discord-messenger/releases
+
+# Development
 
 For developing, you can copy the DiscordMessenger folder into your local NinjaTrader AddOns folder.
 
-For usage, you can download the zip containing the word import in the release page. You can import this zip file similar to importing a normal NinjaTrader Add-On. https://github.com/WaleeTheRobot/ninja-trader-discord-messenger/releases
+You might have to add a reference in NinjaScript Editor to the below dlls which should be available at `C:\Program Files\NinjaTrader 8\bin`.
+
+- Newtonsoft.Json.dll
 
 # Issues
 

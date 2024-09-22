@@ -1,34 +1,23 @@
-﻿using System;
+﻿using NinjaTrader.Custom.AddOns.DiscordMessenger.Configs;
+using NinjaTrader.Custom.AddOns.DiscordMessenger.Models;
+using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
 
-namespace NinjaTrader.Custom.AddOns.DiscordMessenger
+namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Utils
 {
-    public class ButtonConfig
-    {
-        public string Content { get; set; }
-        public string ToggledContent { get; set; }
-        public string BackgroundColor { get; set; }
-        public string HoverBackgroundColor { get; set; }
-        public string ToggledBackgroundColor { get; set; }
-        public string TextColor { get; set; }
-        public Delegate ClickHandler { get; set; }
-        public bool IsToggleable { get; set; }
-        public bool InitialToggleState { get; set; }
-    }
-
     public class ButtonState
     {
         public bool IsToggled { get; set; }
-        public ButtonConfig Config { get; set; }
+        public ButtonModel Config { get; set; }
     }
 
     public static class ButtonUtils
     {
-        public static Button GetButton(ButtonConfig config)
+        public static Button GetButton(ButtonModel config)
         {
             Button button = new Button
             {
@@ -105,7 +94,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
                 Value = false,
                 Setters =
                 {
-                    new Setter(Button.BackgroundProperty, Utils.GetSolidColorBrushFromHex(Colors.ButtonDisabledBgColor)),
+                    new Setter(Button.BackgroundProperty, Utils.GetSolidColorBrushFromHex(CustomColors.BUTTON_DISABLED_BG_COLOR)),
                     new Setter(Button.OpacityProperty, 0.5)
                 }
             });
@@ -157,7 +146,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
             }
             else
             {
-                button.Background = Utils.GetSolidColorBrushFromHex(Colors.ButtonDisabledBgColor);
+                button.Background = Utils.GetSolidColorBrushFromHex(CustomColors.BUTTON_DISABLED_BG_COLOR);
                 button.Opacity = 0.5;
             }
 

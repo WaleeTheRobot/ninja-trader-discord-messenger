@@ -1,5 +1,6 @@
-#region Using declarations
-using NinjaTrader.Custom.AddOns.DiscordMessenger;
+﻿using NinjaTrader.Custom.AddOns.DiscordMessenger.Configs;
+using NinjaTrader.Custom.AddOns.DiscordMessenger.Models;
+using NinjaTrader.Custom.AddOns.DiscordMessenger.Utils;
 using NinjaTrader.Gui.Chart;
 using System;
 using System.Collections.Generic;
@@ -9,19 +10,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using Colors = NinjaTrader.Custom.AddOns.DiscordMessenger.Colors;
-#endregion
 
-namespace NinjaTrader.NinjaScript.Strategies
+namespace NinjaTrader.NinjaScript.Indicators
 {
-    public class EventLog
-    {
-        public string Status { get; set; }
-        public DateTime Time { get; set; }
-        public string Message { get; set; }
-    }
-
-    public partial class DiscordMessenger : Strategy
+    public partial class DiscordMessenger : Indicator
     {
         private ChartTab _chartTab;
         private Chart _chartWindow;
@@ -35,7 +27,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private Button _tradingStatusButton, _screenshotButton;
 
-        private void ControlPanelSetStateDataLoaded()
+        private void LoadControlPanel()
         {
             if (ChartControl != null)
             {
@@ -46,7 +38,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private void ControlPanelSetStateTerminated()
+        private void UnloadControlPanel()
         {
             if (ChartControl != null)
             {
@@ -57,14 +49,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private void UpdateControlPanelUi(bool statusAlive)
+        private void HandleOnWebhookStatusUpdated(Status status)
         {
             if (ChartControl != null)
             {
                 ChartControl.Dispatcher.InvokeAsync(() =>
                 {
-                    UpdateStatusCircle(statusAlive);
-                    UpdateButtons(statusAlive);
+                    UpdateStatusCircle(status);
+                    UpdateButtons(status);
                 });
             }
         }
@@ -98,7 +90,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             _mainGrid = new Grid
             {
                 Margin = new Thickness(0, 60, 0, 0),
-                Background = Utils.GetSolidColorBrushFromHex(Colors.MainGridBgColor)
+                Background = Utils.GetSolidColorBrushFromHex(CustomColors.MAIN_GRID_BG_COLOR)
             };
 
             // Define row and column structure
@@ -134,14 +126,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Width = 15,
                 Height = 15,
-                Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(Colors.StatusFailed)),
+                Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(CustomColors.STATUS_FAILED)),
                 Margin = new Thickness(0, 0, 10, 0)
             };
 
             TextBlock statusText = new TextBlock
             {
                 Text = "Discord Webhook Status",
-                Foreground = Utils.GetSolidColorBrushFromHex(Colors.TextColor),
+                Foreground = Utils.GetSolidColorBrushFromHex(CustomColors.TEXT_COLOR),
                 VerticalAlignment = VerticalAlignment.Center
             };
 
@@ -153,15 +145,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             _mainGrid.Children.Add(statusPanel);
         }
 
-        private void UpdateStatusCircle(bool statusAlive)
+        private void UpdateStatusCircle(Status status)
         {
-            if (statusAlive)
+            switch (status)
             {
-                _statusCircle.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(Colors.StatusSuccess));
-            }
-            else
-            {
-                _statusCircle.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(Colors.StatusFailed));
+                case Status.Success:
+                    _statusCircle.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(CustomColors.STATUS_SUCCESS));
+                    break;
+                case Status.Failed:
+                    _statusCircle.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(CustomColors.STATUS_FAILED));
+                    break;
+                case Status.PartialSuccess:
+                    _statusCircle.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(CustomColors.STATUS_PARTIAL_SUCCESS));
+                    break;
             }
         }
 
@@ -176,7 +172,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Text = "Recent Events",
                 FontSize = 14,
-                Foreground = Utils.GetSolidColorBrushFromHex(Colors.TextColor),
+                Foreground = Utils.GetSolidColorBrushFromHex(CustomColors.TEXT_COLOR),
                 FontWeight = FontWeights.Bold,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(4, 10, 0, 0)
@@ -191,7 +187,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Content = "",
                 FontSize = 10,
-                Foreground = Utils.GetSolidColorBrushFromHex(Colors.TextColor),
+                Foreground = Utils.GetSolidColorBrushFromHex(CustomColors.TEXT_COLOR),
                 VerticalAlignment = VerticalAlignment.Top,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Margin = new Thickness(0, 4, 0, 0),
@@ -248,14 +244,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void AddButtons()
         {
             // Trading Status button
-            _tradingStatusButton = ButtonUtils.GetButton(new ButtonConfig
+            _tradingStatusButton = ButtonUtils.GetButton(new ButtonModel
             {
                 Content = "Trading Status Disabled",
                 ToggledContent = "Trading Status Enabled",
-                BackgroundColor = Colors.ButtonBgColor,
-                HoverBackgroundColor = Colors.ButtonHoverBgColor,
-                ToggledBackgroundColor = Colors.ButtonToggledBgColor,
-                TextColor = Colors.TextColor,
+                BackgroundColor = CustomColors.BUTTON_BG_COLOR,
+                HoverBackgroundColor = CustomColors.BUTTON_HOVER_BG_COLOR,
+                ToggledBackgroundColor = CustomColors.BUTTON_TOGGLED_BG_COLOR,
+                TextColor = CustomColors.TEXT_COLOR,
                 ClickHandler = (Action<object, RoutedEventArgs>)TradingStatusButtonClick,
                 IsToggleable = true,
                 // Start in the toggled "Enabled" state
@@ -267,12 +263,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             _mainGrid.Children.Add(_tradingStatusButton);
 
             // Send Screenshot button
-            _screenshotButton = ButtonUtils.GetButton(new ButtonConfig
+            _screenshotButton = ButtonUtils.GetButton(new ButtonModel
             {
                 Content = "Send Screenshot",
-                BackgroundColor = Colors.ButtonBgColor,
-                HoverBackgroundColor = Colors.ButtonHoverBgColor,
-                TextColor = Colors.TextColor,
+                BackgroundColor = CustomColors.BUTTON_BG_COLOR,
+                HoverBackgroundColor = CustomColors.BUTTON_HOVER_BG_COLOR,
+                TextColor = CustomColors.TEXT_COLOR,
                 ClickHandler = (Func<object, RoutedEventArgs, Task>)SendScreenshotButtonClickAsync,
                 IsToggleable = false
             });
@@ -282,13 +278,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             _mainGrid.Children.Add(_screenshotButton);
 
             // Initially disable buttons
-            UpdateButtons(false);
+            UpdateButtons(Status.Failed);
         }
 
-        private void UpdateButtons(bool statusAlive)
+        private void UpdateButtons(Status status)
         {
-            ButtonUtils.UpdateButtonState(_tradingStatusButton, statusAlive);
-            ButtonUtils.UpdateButtonState(_screenshotButton, statusAlive);
+            bool enable = status != Status.Success || status != Status.PartialSuccess;
+
+            ButtonUtils.UpdateButtonState(_tradingStatusButton, enable);
+            ButtonUtils.UpdateButtonState(_screenshotButton, enable);
         }
 
         private void TradingStatusButtonClick(object sender, RoutedEventArgs e)
@@ -296,12 +294,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             Button button = (Button)sender;
             ButtonState state = (ButtonState)button.Tag;
 
-            _tradingStatusDisabled = !state.IsToggled;
+            // _tradingStatusDisabled = !state.IsToggled;
         }
 
         private async Task SendScreenshotButtonClickAsync(object sender, RoutedEventArgs e)
         {
-            await SendScreenshotAsync((success, message) =>
+            /*await SendScreenshotAsync((success, message) =>
             {
                 if (success)
                 {
@@ -312,7 +310,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     AddEventLog("Failed", "Screenshot Sent");
                     Print(message);
                 }
-            });
+            });*/
         }
 
         #endregion
