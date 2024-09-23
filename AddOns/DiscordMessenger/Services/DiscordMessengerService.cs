@@ -1,5 +1,4 @@
 ﻿using NinjaTrader.Custom.AddOns.DiscordMessenger.Configs;
-using NinjaTrader.Custom.AddOns.DiscordMessenger.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,6 +9,8 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Media;
+using OrderEntry = NinjaTrader.Custom.AddOns.DiscordMessenger.Models.OrderEntry;
+using Position = NinjaTrader.Custom.AddOns.DiscordMessenger.Models.Position;
 
 namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
 {
@@ -20,9 +21,11 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
 
         private List<string> _webhookUrls;
         private string _screenshotLocation;
-        private string _screenshotName;
 
-        private int _finalEmbededColor;
+        private string _screenshotPath;
+        private object _embedContent;
+
+        private int _finalEmbedColor;
         private Assembly _newtonsoftJsonAssembly;
         private Type _jsonConvertType;
 
@@ -30,17 +33,20 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
         {
             _eventManager = eventManager;
             _eventManager.OnOrderEntryProcessed += HandleOnOrderEntryProcessed;
+            _eventManager.OnScreenshotProcessed += HandleOnScreenshotProcessed;
+            _eventManager.OnAutoScreenshotProcessedWaiting += HandleOnAutoScreenshotProcessedWaiting;
             _httpClient = new HttpClient();
 
             _webhookUrls = Config.Instance.WebhookUrls;
             _screenshotLocation = Config.Instance.ScreenshotLocation;
-            _screenshotName = "test.jpg";
+            _screenshotPath = "";
+            _embedContent = null;
 
             var solidColorBrush = Config.Instance.EmbededColor as SolidColorBrush;
             if (solidColorBrush != null)
             {
                 var color = solidColorBrush.Color;
-                _finalEmbededColor = (color.R << 16) | (color.G << 8) | color.B;
+                _finalEmbedColor = (color.R << 16) | (color.G << 8) | color.B;
             }
 
             // Load Newtonsoft from NT using reflection
@@ -50,7 +56,20 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
 
         private void HandleOnOrderEntryProcessed(List<Position> positions, List<OrderEntry> orderEntries)
         {
-            _ = SendMessageAsync(positions, orderEntries, (success, message) =>
+            _embedContent = GetEmbedContent(positions, orderEntries);
+
+            Task.Run(async () =>
+            {
+                // We want the chart to update the orders prior to the screenshot
+                await Task.Delay(1000);
+                _eventManager.TakeScreenshot(ProcessType.Auto, $"{DateTime.Now:yyyyMMddHHmmss}.png");
+            });
+        }
+
+        // Screenshot taken and now waiting for auto processing
+        private void HandleOnAutoScreenshotProcessedWaiting()
+        {
+            _ = SendMessageAsync((success, message) =>
             {
                 if (success)
                 {
@@ -63,57 +82,26 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
                     // Print(message);
                     _eventManager.PrintMessage("FAILED");
                 }
+
+                _screenshotPath = "";
+                _embedContent = null;
             });
         }
 
-        private async Task SendMessageAsync(List<Position> positions, List<OrderEntry> orderEntries, Action<bool, string> callback)
+        private async Task SendMessageAsync(Action<bool, string> callback)
         {
-            //await TakeScreenshot();
-
-            var embedContent = GetEmbedContent(positions, orderEntries);
-            string filePath = Path.Combine(_screenshotLocation, _screenshotName);
             var serializeMethod = _jsonConvertType.GetMethod("SerializeObject", new[] { typeof(object) });
 
-            // Create the message payload with embeds
             var messagePayload = new
             {
-                embeds = new[] { embedContent }
+                embeds = new[] { _embedContent }
             };
             var jsonPayload = (string)serializeMethod.Invoke(null, new object[] { messagePayload });
 
-            // Ensure the file exists before sending
-            /*if (!await EnsureFileExists(filePath))
-            {
-                callback(false, "Failed to send message. Screenshot file not found after retries.");
-                return;
-            }*/
-
-            await SendHttpRequestAsync(filePath, jsonPayload, callback);
-
-            /* await TakeScreenshot();
-
-             var embedContent = GetEmbedContent();
-             string filePath = Path.Combine(ScreenshotLocation, _screenshotName);
-             var serializeMethod = _jsonConvertType.GetMethod("SerializeObject", new[] { typeof(object) });
-
-             // Create the message payload with embeds
-             var messagePayload = new
-             {
-                 embeds = new[] { embedContent }
-             };
-             var jsonPayload = (string)serializeMethod.Invoke(null, new object[] { messagePayload });
-
-             // Ensure the file exists before sending
-             if (!await EnsureFileExists(filePath))
-             {
-                 callback(false, "Failed to send message. Screenshot file not found after retries.");
-                 return;
-             }
-
-             await SendHttpRequestAsync(filePath, jsonPayload, callback);*/
+            await SendHttpRequestAsync(jsonPayload, callback);
         }
 
-        private async Task SendHttpRequestAsync(string filePath, string jsonPayload, Action<bool, string> callback)
+        private async Task SendHttpRequestAsync(string jsonPayload, Action<bool, string> callback)
         {
             try
             {
@@ -125,10 +113,10 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
                         formData.Add(jsonContent, "payload_json");
                     }
 
-                    var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+                    var fileStream = new FileStream(_screenshotPath, FileMode.Open, FileAccess.Read);
                     var fileContent = new StreamContent(fileStream);
                     fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-                    formData.Add(fileContent, "file", Path.GetFileName(filePath));
+                    formData.Add(fileContent, "file", Path.GetFileName(_screenshotPath));
 
                     HttpResponseMessage response = await _httpClient.PostAsync(_webhookUrls[0], formData);
 
@@ -136,7 +124,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
                     {
                         try
                         {
-                            //File.Delete(filePath);
+                            File.Delete(_screenshotPath);
                             callback(true, "Screenshot sent and file deleted successfully.");
                         }
                         catch (Exception deleteEx)
@@ -156,34 +144,43 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
             }
         }
 
-        private async Task TakeScreenshot()
+        private async Task HandleOnScreenshotProcessed(ProcessType processType, string screenshotName)
         {
-            /*await Dispatcher.InvokeAsync(() =>
+            string filePath = Path.Combine(_screenshotLocation, screenshotName);
+
+            if (processType == ProcessType.Auto)
             {
-                if (_chartWindow != null)
+                _screenshotPath = filePath;
+                _eventManager.AutoScreenshotProcessedWaiting();
+            }
+            else
+            {
+                // Send the screenshot asynchronously and handle the callback
+                await SendScreenshotAsync(filePath, (success, message) =>
                 {
-                    RenderTargetBitmap screenCapture = _chartWindow.GetScreenshot(ShareScreenshotType.Chart);
-                    _outputFrame = BitmapFrame.Create(screenCapture);
-
-                    _screenshotName = $"{DateTime.Now:yyyyMMddHHmmss}.png";
-
-                    if (!Directory.Exists(ScreenshotLocation))
+                    if (success)
                     {
-                        Directory.CreateDirectory(ScreenshotLocation);
+                        _eventManager.PrintMessage("Screenshot sent successfully.");
                     }
-
-                    if (screenCapture != null)
+                    else
                     {
-                        PngBitmapEncoder png = new PngBitmapEncoder();
-                        png.Frames.Add(_outputFrame);
-
-                        using (Stream stream = File.Create(Path.Combine(ScreenshotLocation, _screenshotName)))
-                        {
-                            png.Save(stream);
-                        }
+                        _eventManager.PrintMessage("Failed to send screenshot.");
                     }
-                }
-            });*/
+                });
+            }
+        }
+
+        private async Task SendScreenshotAsync(string filePath, Action<bool, string> callback)
+        {
+            // Ensure the file exists before sending
+            if (!await EnsureFileExists(filePath))
+            {
+                callback(false, "Failed to send screenshot. File not found after retries.");
+                return;
+            }
+
+            // Send the screenshot via HTTP request
+            await SendHttpRequestAsync(null, callback);
         }
 
         private async Task<bool> EnsureFileExists(string filePath, int retryCount = 5, int delayMilliseconds = 500)
@@ -204,7 +201,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
             var embed = new
             {
                 title = "Trading Status",
-                color = _finalEmbededColor,
+                color = _finalEmbedColor,
                 fields = new List<object>()
             };
 

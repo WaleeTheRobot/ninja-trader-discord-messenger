@@ -19,6 +19,7 @@ namespace NinjaTrader.NinjaScript.Indicators
         public const string GROUP_NAME = "Discord Messenger";
 
         private Brush _embededColor;
+        private bool _autoSend;
         private bool _orderUpdateTriggered;
 
         private EventManager _eventManager;
@@ -35,7 +36,7 @@ namespace NinjaTrader.NinjaScript.Indicators
         }
 
         [NinjaScriptProperty]
-        [Display(Name = "Webhook URLs", Description = "The URL for your Discord server webhook. Separate the URL by a comma for more than one webhook URL.", Order = 1, GroupName = GROUP_NAME)]
+        [Display(Name = "Webhook URLs", Description = "The URLs for your Discord server webhook. Separate a URL by a comma for multiple URLs.", Order = 1, GroupName = GROUP_NAME)]
         public string WebhookUrls { get; set; }
 
         [NinjaScriptProperty]
@@ -90,6 +91,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
             else if (State == State.Configure)
             {
+                _autoSend = true;
                 _orderUpdateTriggered = false;
 
                 Account account = Account.All.FirstOrDefault(a => a.Name == AccountName);
@@ -105,6 +107,8 @@ namespace NinjaTrader.NinjaScript.Indicators
                     _eventManager = new EventManager();
                     _eventManager.OnPrintMessage += HandlePrintMessage;
                     _eventManager.OnWebhookStatusUpdated += HandleOnWebhookStatusUpdated;
+                    _eventManager.OnAutoButtonClicked += HandleAutoButtonClicked;
+                    _eventManager.OnTakeScreenshot += HandleScreenshot;
 
                     new TradingStatusService(_eventManager);
                     new DiscordMessengerService(_eventManager);
@@ -121,12 +125,19 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
             else if (State == State.Realtime)
             {
-                _eventManager.StartWebhookChecker();
+                if (_eventManager != null)
+                {
+                    _eventManager.StartWebhookChecker();
+                }
             }
             else if (State == State.Terminated)
             {
                 UnloadControlPanel();
-                _eventManager.StopWebhookChecker();
+
+                if (_eventManager != null)
+                {
+                    _eventManager.StopWebhookChecker();
+                }
             }
         }
 
@@ -145,7 +156,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 
         protected override void OnBarUpdate()
         {
-            if (State != State.Realtime)
+            if (State != State.Realtime || !_autoSend)
             {
                 return;
             }
@@ -171,6 +182,11 @@ namespace NinjaTrader.NinjaScript.Indicators
             return string.IsNullOrEmpty(WebhookUrls)
                 ? new List<string>()
                 : WebhookUrls.Split(',').Select(url => url.Trim()).ToList();
+        }
+
+        private void HandleAutoButtonClicked(bool isEnabled)
+        {
+            _autoSend = isEnabled;
         }
 
         // Used for debugging event messages

@@ -2,6 +2,7 @@
 using NinjaTrader.Custom.AddOns.DiscordMessenger.Models;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace NinjaTrader.Custom.AddOns.DiscordMessenger
 {
@@ -18,6 +19,14 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
         public event Action OnStartWebhookChecker;
         public event Action OnStopWebhookChecker;
         public event Action<Status> OnWebhookStatusUpdated;
+
+        // ControlPanel
+        public event Action<Status> OnUpdateStatus;
+        public event Action<EventLog> OnUpdateEventLog;
+        public event Action<bool> OnAutoButtonClicked;
+        public event Func<ProcessType, string, Task> OnTakeScreenshot;
+        public event Func<ProcessType, string, Task> OnScreenshotProcessed;
+        public event Action OnAutoScreenshotProcessedWaiting;
 
         // Debug
         public event Action<string> OnPrintMessage;
@@ -57,6 +66,41 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
         public void UpdateWebhookStatus(Status status)
         {
             OnWebhookStatusUpdated?.Invoke(status);
+        }
+
+        #endregion
+
+        #region ControlPanel
+
+        public void UpdateEventLog(EventLog eventLog)
+        {
+            OnUpdateEventLog?.Invoke(eventLog);
+        }
+
+        public void UpdateStatus(Status status)
+        {
+            OnUpdateStatus?.Invoke(status);
+        }
+
+        public void AutoButtonClicked(bool isEnabled)
+        {
+            OnAutoButtonClicked?.Invoke(isEnabled);
+        }
+
+        public void TakeScreenshot(ProcessType processType, string screenshotName)
+        {
+            OnTakeScreenshot?.Invoke(processType, screenshotName);
+        }
+
+        public void ScreenshotProcessed(ProcessType processType, string screenshotName)
+        {
+            OnScreenshotProcessed?.Invoke(processType, screenshotName);
+        }
+
+        // Screenshot done and waiting for auto processing
+        public void AutoScreenshotProcessedWaiting()
+        {
+            OnAutoScreenshotProcessedWaiting?.Invoke();
         }
 
         #endregion

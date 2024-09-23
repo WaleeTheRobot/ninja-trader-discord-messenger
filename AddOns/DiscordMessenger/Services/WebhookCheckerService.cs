@@ -38,6 +38,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
         {
             int successCount = 0;
             int failCount = 0;
+            int totalWebhookUrls = _webhookUrls.Count;
 
             foreach (var webhookUrl in _webhookUrls)
             {
@@ -62,13 +63,13 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
 
             Status currentStatus;
 
-            if (successCount == _webhookUrls.Count)
-            {
-                currentStatus = Status.Success;
-            }
-            else if (failCount == _webhookUrls.Count)
+            if (failCount == totalWebhookUrls)
             {
                 currentStatus = Status.Failed;
+            }
+            else if (successCount == totalWebhookUrls)
+            {
+                currentStatus = Status.Success;
             }
             else
             {
