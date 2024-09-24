@@ -1,4 +1,5 @@
 ﻿using NinjaTrader.Custom.AddOns.DiscordMessenger.Configs;
+using NinjaTrader.Custom.AddOns.DiscordMessenger.Events;
 using NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Configs;
 using NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Utils;
 using System.Windows;
@@ -10,13 +11,13 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Components
 {
     public class WebhookStatusGrid : Grid, IComponentSetup
     {
-        private EventManager _eventManager;
+        private readonly ControlPanelEvents _controlPanelEvents;
         private Ellipse _statusCircle;
 
-        public WebhookStatusGrid(EventManager eventManager)
+        public WebhookStatusGrid(ControlPanelEvents controlPanelEvents)
         {
-            _eventManager = eventManager;
-            _eventManager.OnUpdateStatus += HandleUpdateStatus;
+            _controlPanelEvents = controlPanelEvents;
+            _controlPanelEvents.OnUpdateStatus += HandleUpdateStatus;
             InitializeComponent();
         }
 

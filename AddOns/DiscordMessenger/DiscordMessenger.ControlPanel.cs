@@ -51,7 +51,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             {
                 ChartControl.Dispatcher.InvokeAsync(() =>
                 {
-                    _eventManager.UpdateStatus(status);
+                    _controlPanelEvents.UpdateStatus(status);
                 });
             }
         }
@@ -78,15 +78,15 @@ namespace NinjaTrader.NinjaScript.Indicators
             _mainGrid.RowDefinitions.Add(new RowDefinition());
 
             // Instantiate and add the new components
-            _webhookStatusGrid = new WebhookStatusGrid(_eventManager);
+            _webhookStatusGrid = new WebhookStatusGrid(_controlPanelEvents);
             Grid.SetRow(_webhookStatusGrid, 0);
             _mainGrid.Children.Add(_webhookStatusGrid);
 
-            _buttonsGrid = new ButtonsGrid(_eventManager);
+            _buttonsGrid = new ButtonsGrid(_controlPanelEvents, _tradingStatusEvents);
             Grid.SetRow(_buttonsGrid, 1);
             _mainGrid.Children.Add(_buttonsGrid);
 
-            _recentEventsGrid = new RecentEventsGrid(_eventManager);
+            _recentEventsGrid = new RecentEventsGrid(_eventLoggingEvents);
             Grid.SetRow(_recentEventsGrid, 2);
             _mainGrid.Children.Add(_recentEventsGrid);
 
@@ -127,7 +127,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                                 png.Save(stream);
                             }
 
-                            _eventManager.ScreenshotProcessed(processType, screenshotName);
+                            _ = _controlPanelEvents.ScreenshotProcessed(processType, screenshotName);
                         }
                     }
                 }

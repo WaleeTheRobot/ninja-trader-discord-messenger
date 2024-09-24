@@ -1,4 +1,5 @@
 ﻿using NinjaTrader.Custom.AddOns.DiscordMessenger.Configs;
+using NinjaTrader.Custom.AddOns.DiscordMessenger.Events;
 using NinjaTrader.Custom.AddOns.DiscordMessenger.Models;
 using System;
 using System.Collections.Generic;
@@ -17,7 +18,10 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
 {
     public class DiscordMessengerService
     {
-        private readonly EventManager _eventManager;
+        private readonly EventLoggingEvents _eventLoggingEvents;
+        private readonly TradingStatusEvents _tradingStatusEvents;
+        private readonly ControlPanelEvents _controlPanelEvents;
+
         private readonly HttpClient _httpClient;
 
         private List<string> _webhookUrls;
@@ -30,12 +34,21 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
         private Assembly _newtonsoftJsonAssembly;
         private Type _jsonConvertType;
 
-        public DiscordMessengerService(EventManager eventManager)
+        public DiscordMessengerService(
+            EventLoggingEvents eventLoggingEvents,
+            TradingStatusEvents tradingStatusEvents,
+            ControlPanelEvents controlPanelEvents
+            )
         {
-            _eventManager = eventManager;
-            _eventManager.OnOrderEntryProcessed += HandleOnOrderEntryProcessed;
-            _eventManager.OnScreenshotProcessed += HandleOnScreenshotProcessed;
-            _eventManager.OnAutoScreenshotProcessedWaiting += HandleOnAutoScreenshotProcessedWaiting;
+            _eventLoggingEvents = eventLoggingEvents;
+
+            _tradingStatusEvents = tradingStatusEvents;
+            _tradingStatusEvents.OnOrderEntryProcessed += HandleOnOrderEntryProcessed;
+
+            _controlPanelEvents = controlPanelEvents;
+            _controlPanelEvents.OnScreenshotProcessed += HandleOnScreenshotProcessed;
+            _controlPanelEvents.OnAutoScreenshotProcessedWaiting += HandleOnAutoScreenshotProcessedWaiting;
+
             _httpClient = new HttpClient();
 
             _webhookUrls = Config.Instance.WebhookUrls;
@@ -63,7 +76,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
             {
                 // We want the chart to update the orders prior to the screenshot
                 await Task.Delay(1000);
-                _eventManager.TakeScreenshot(ProcessType.Auto);
+                _ = _controlPanelEvents.TakeScreenshot(ProcessType.Auto);
             });
         }
 
@@ -74,7 +87,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
             {
                 if (success)
                 {
-                    _eventManager.SendRecentEvent(new EventLog
+                    _eventLoggingEvents.SendRecentEvent(new EventLog
                     {
                         Status = Status.Success,
                         Message = "Trading Status Sent"
@@ -82,7 +95,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
                 }
                 else
                 {
-                    _eventManager.SendRecentEvent(new EventLog
+                    _eventLoggingEvents.SendRecentEvent(new EventLog
                     {
                         Status = Status.Failed,
                         Message = "Trading Status Sent"
@@ -162,7 +175,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
 
             if (processType == ProcessType.Auto)
             {
-                _eventManager.AutoScreenshotProcessedWaiting();
+                _controlPanelEvents.AutoScreenshotProcessedWaiting();
             }
             else
             {
@@ -171,7 +184,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
                 {
                     if (success)
                     {
-                        _eventManager.SendRecentEvent(new EventLog
+                        _eventLoggingEvents.SendRecentEvent(new EventLog
                         {
                             Status = Status.Success,
                             Message = "Screenshot Sent"
@@ -179,7 +192,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
                     }
                     else
                     {
-                        _eventManager.SendRecentEvent(new EventLog
+                        _eventLoggingEvents.SendRecentEvent(new EventLog
                         {
                             Status = Status.Failed,
                             Message = "Screenshot Sent"

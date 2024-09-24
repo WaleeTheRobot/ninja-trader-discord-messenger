@@ -1,5 +1,6 @@
 ﻿using NinjaTrader.Cbi;
 using NinjaTrader.Custom.AddOns.DiscordMessenger.Configs;
+using NinjaTrader.Custom.AddOns.DiscordMessenger.Events;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,15 +11,15 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
 {
     public class TradingStatusService
     {
-        private readonly EventManager _eventManager;
+        private readonly TradingStatusEvents _tradingStatusEvents;
         private Account _account;
         private List<Position> _positions;
         private List<OrderEntry> _orderEntries;
 
-        public TradingStatusService(EventManager eventManager)
+        public TradingStatusService(TradingStatusEvents tradingStatusEvents)
         {
-            _eventManager = eventManager;
-            _eventManager.OnOrderEntryUpdated += HandleOrderEntryUpdated;
+            _tradingStatusEvents = tradingStatusEvents;
+            _tradingStatusEvents.OnOrderEntryUpdated += HandleOrderEntryUpdated;
 
             _account = Config.Instance.Account;
 
@@ -119,7 +120,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
 
             HandlePositionUpdated();
 
-            _eventManager.OrderEntryProcessed(_positions, _orderEntries);
+            _tradingStatusEvents.OrderEntryProcessed(_positions, _orderEntries);
         }
     }
 }

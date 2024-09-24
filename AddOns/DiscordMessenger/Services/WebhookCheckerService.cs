@@ -1,4 +1,5 @@
 ﻿using NinjaTrader.Custom.AddOns.DiscordMessenger.Configs;
+using NinjaTrader.Custom.AddOns.DiscordMessenger.Events;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading;
@@ -7,17 +8,17 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
 {
     public class WebhookCheckerService
     {
-        private readonly EventManager _eventManager;
+        private readonly WebhookCheckerEvents _webhookCheckerEvents;
         private HttpClient _httpClient;
         private Timer _timer;
 
         private List<string> _webhookUrls;
 
-        public WebhookCheckerService(EventManager eventManager)
+        public WebhookCheckerService(WebhookCheckerEvents webhookCheckerEvents)
         {
-            _eventManager = eventManager;
-            _eventManager.OnStartWebhookChecker += HandleStartWebhookChecker;
-            _eventManager.OnStopWebhookChecker += HandleStopWebhookChecker;
+            _webhookCheckerEvents = webhookCheckerEvents;
+            _webhookCheckerEvents.OnStartWebhookChecker += HandleStartWebhookChecker;
+            _webhookCheckerEvents.OnStopWebhookChecker += HandleStopWebhookChecker;
             _httpClient = new HttpClient();
 
             _webhookUrls = Config.Instance.WebhookUrls;
@@ -76,7 +77,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
                 currentStatus = Status.PartialSuccess;
             }
 
-            _eventManager.UpdateWebhookStatus(currentStatus);
+            _webhookCheckerEvents.UpdateWebhookStatus(currentStatus);
         }
     }
 }

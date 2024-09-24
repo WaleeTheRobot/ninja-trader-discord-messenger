@@ -1,7 +1,7 @@
 #region Using declarations
 using NinjaTrader.Cbi;
-using NinjaTrader.Custom.AddOns.DiscordMessenger;
 using NinjaTrader.Custom.AddOns.DiscordMessenger.Configs;
+using NinjaTrader.Custom.AddOns.DiscordMessenger.Events;
 using NinjaTrader.Custom.AddOns.DiscordMessenger.Services;
 using NinjaTrader.Gui;
 using System.Collections.Generic;
@@ -23,6 +23,10 @@ namespace NinjaTrader.NinjaScript.Indicators
         private bool _orderUpdateTriggered;
 
         private EventManager _eventManager;
+        private ControlPanelEvents _controlPanelEvents;
+        private WebhookCheckerEvents _webhookCheckerEvents;
+        private TradingStatusEvents _tradingStatusEvents;
+        private EventLoggingEvents _eventLoggingEvents;
 
         #region Properties
 
@@ -103,17 +107,25 @@ namespace NinjaTrader.NinjaScript.Indicators
                     // Set initial config
                     SetConfig(account);
 
-                    // Initialize manager and services
+                    // Initialize Events
                     _eventManager = new EventManager();
                     _eventManager.OnPrintMessage += HandlePrintMessage;
-                    _eventManager.OnWebhookStatusUpdated += HandleOnWebhookStatusUpdated;
-                    _eventManager.OnAutoButtonClicked += HandleAutoButtonClicked;
-                    _eventManager.OnTakeScreenshot += HandleScreenshot;
 
-                    new TradingStatusService(_eventManager);
-                    new DiscordMessengerService(_eventManager);
-                    new WebhookCheckerService(_eventManager);
-                    new EventLoggingService(_eventManager);
+                    _controlPanelEvents = new ControlPanelEvents(_eventManager);
+                    _controlPanelEvents.OnAutoButtonClicked += HandleAutoButtonClicked;
+                    _controlPanelEvents.OnTakeScreenshot += HandleScreenshot;
+
+                    _webhookCheckerEvents = new WebhookCheckerEvents(_eventManager);
+                    _webhookCheckerEvents.OnWebhookStatusUpdated += HandleOnWebhookStatusUpdated;
+
+                    _tradingStatusEvents = new TradingStatusEvents(_eventManager);
+                    _eventLoggingEvents = new EventLoggingEvents(_eventManager);
+
+                    // Initialize Services
+                    new WebhookCheckerService(_webhookCheckerEvents);
+                    new TradingStatusService(_tradingStatusEvents);
+                    new EventLoggingService(_eventLoggingEvents);
+                    new DiscordMessengerService(_eventLoggingEvents, _tradingStatusEvents, _controlPanelEvents);
                 }
                 else
                 {
@@ -128,7 +140,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             {
                 if (_eventManager != null)
                 {
-                    _eventManager.StartWebhookChecker();
+                    _webhookCheckerEvents.StartWebhookChecker();
                 }
             }
             else if (State == State.Terminated)
@@ -137,7 +149,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 
                 if (_eventManager != null)
                 {
-                    _eventManager.StopWebhookChecker();
+                    _webhookCheckerEvents.StopWebhookChecker();
                 }
             }
         }
@@ -165,7 +177,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (_orderUpdateTriggered)
             {
                 _orderUpdateTriggered = false;
-                _eventManager.UpdateOrderEntry();
+                _tradingStatusEvents.UpdateOrderEntry();
             }
         }
 

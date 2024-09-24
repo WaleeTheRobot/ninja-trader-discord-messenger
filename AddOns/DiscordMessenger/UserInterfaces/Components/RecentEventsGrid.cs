@@ -1,4 +1,5 @@
-﻿using NinjaTrader.Custom.AddOns.DiscordMessenger.Models;
+﻿using NinjaTrader.Custom.AddOns.DiscordMessenger.Events;
+using NinjaTrader.Custom.AddOns.DiscordMessenger.Models;
 using NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Configs;
 using NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Utils;
 using System.Collections.Generic;
@@ -11,13 +12,13 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Components
 {
     public class RecentEventsGrid : Grid, IComponentSetup
     {
-        private EventManager _eventManager;
+        private EventLoggingEvents _eventLoggingEvents;
         private Label _eventLogsListlabel;
 
-        public RecentEventsGrid(EventManager eventManager)
+        public RecentEventsGrid(EventLoggingEvents eventLoggingEvents)
         {
-            _eventManager = eventManager;
-            _eventManager.OnRecentEventProcessed += HandleRecentEventProcessed;
+            _eventLoggingEvents = eventLoggingEvents;
+            _eventLoggingEvents.OnRecentEventProcessed += HandleRecentEventProcessed;
             InitializeComponent();
         }
 
@@ -51,7 +52,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Components
                 VerticalAlignment = VerticalAlignment.Top,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Margin = new Thickness(0, 4, 0, 0),
-                Height = 100,
+                Height = 100, // You can adjust the height as needed
                 VerticalContentAlignment = VerticalAlignment.Top,
                 Padding = new Thickness(5),
                 BorderThickness = new Thickness(0),
@@ -59,6 +60,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Components
             };
 
             stackPanel.Children.Add(_eventLogsListlabel);
+
             this.Children.Add(stackPanel);
         }
 

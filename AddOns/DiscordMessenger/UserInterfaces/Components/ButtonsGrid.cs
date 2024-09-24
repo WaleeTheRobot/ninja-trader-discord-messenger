@@ -1,4 +1,5 @@
 ﻿using NinjaTrader.Custom.AddOns.DiscordMessenger.Configs;
+using NinjaTrader.Custom.AddOns.DiscordMessenger.Events;
 using NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Configs;
 using NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Models;
 using NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Utils;
@@ -10,13 +11,17 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Components
 {
     public class ButtonsGrid : Grid, IComponentSetup
     {
-        private EventManager _eventManager;
+        private ControlPanelEvents _controlPanelEvents;
+        private TradingStatusEvents _tradingStatusEvents;
         private Button _autoButton, _tradingStatusButton, _screenshotButton;
 
-        public ButtonsGrid(EventManager eventManager)
+        public ButtonsGrid(ControlPanelEvents controlPanelEvents, TradingStatusEvents tradingStatusEvents)
         {
-            _eventManager = eventManager;
-            _eventManager.OnUpdateStatus += HandleUpdateStatus;
+            _controlPanelEvents = controlPanelEvents;
+            _controlPanelEvents.OnUpdateStatus += HandleUpdateStatus;
+
+            _tradingStatusEvents = tradingStatusEvents;
+
             InitializeComponent();
         }
 
@@ -86,17 +91,17 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Components
             Button button = (Button)sender;
             ButtonState state = (ButtonState)button.Tag;
 
-            _eventManager.AutoButtonClicked(!state.IsToggled);
+            _controlPanelEvents.AutoButtonClicked(!state.IsToggled);
         }
 
         private void HandleTradingStatusButtonClick(object sender, RoutedEventArgs e)
         {
-            _eventManager.UpdateOrderEntry();
+            _tradingStatusEvents.UpdateOrderEntry();
         }
 
         private void HandleScreenshotButtonClick(object sender, RoutedEventArgs e)
         {
-            _eventManager.TakeScreenshot(ProcessType.Manual);
+            _ = _controlPanelEvents.TakeScreenshot(ProcessType.Manual);
         }
     }
 }
