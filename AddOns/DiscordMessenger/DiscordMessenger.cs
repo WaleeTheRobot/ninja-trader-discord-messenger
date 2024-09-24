@@ -113,6 +113,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                     new TradingStatusService(_eventManager);
                     new DiscordMessengerService(_eventManager);
                     new WebhookCheckerService(_eventManager);
+                    new EventLoggingService(_eventManager);
                 }
                 else
                 {

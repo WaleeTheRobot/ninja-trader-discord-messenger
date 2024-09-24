@@ -1,4 +1,5 @@
 ﻿using NinjaTrader.Custom.AddOns.DiscordMessenger.Configs;
+using NinjaTrader.Custom.AddOns.DiscordMessenger.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -73,14 +74,19 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
             {
                 if (success)
                 {
-                    // AddEventLog("Success", "Trading Status Sent");
-                    _eventManager.PrintMessage("SUCCESS");
+                    _eventManager.SendRecentEvent(new EventLog
+                    {
+                        Status = Status.Success,
+                        Message = "Trading Status Sent"
+                    });
                 }
                 else
                 {
-                    // AddEventLog("Failed", "Trading Status Sent");
-                    // Print(message);
-                    _eventManager.PrintMessage("FAILED");
+                    _eventManager.SendRecentEvent(new EventLog
+                    {
+                        Status = Status.Failed,
+                        Message = "Trading Status Sent"
+                    });
                 }
 
                 _screenshotPath = "";
@@ -165,11 +171,19 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
                 {
                     if (success)
                     {
-                        _eventManager.PrintMessage("Screenshot sent successfully.");
+                        _eventManager.SendRecentEvent(new EventLog
+                        {
+                            Status = Status.Success,
+                            Message = "Screenshot Sent"
+                        });
                     }
                     else
                     {
-                        _eventManager.PrintMessage("Failed to send screenshot.");
+                        _eventManager.SendRecentEvent(new EventLog
+                        {
+                            Status = Status.Failed,
+                            Message = "Screenshot Sent"
+                        });
                     }
                 });
             }

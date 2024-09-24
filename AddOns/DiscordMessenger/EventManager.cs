@@ -12,8 +12,9 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
         public event Action OnOrderEntryUpdated;
         public event Action<List<Position>, List<OrderEntry>> OnOrderEntryProcessed;
 
-        // DiscordMessengerService
-
+        // EventLoggingService
+        public event Action<EventLog> OnSendRecentEvent;
+        public event Action<List<EventLog>> OnRecentEventProcessed;
 
         // WebhookCheckerService
         public event Action OnStartWebhookChecker;
@@ -45,9 +46,17 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
 
         #endregion
 
-        #region DiscordMessengerService
+        #region EventLoggingService
 
+        public void SendRecentEvent(EventLog eventLog)
+        {
+            OnSendRecentEvent?.Invoke(eventLog);
+        }
 
+        public void RecentEventProcessed(List<EventLog> eventLogs)
+        {
+            OnRecentEventProcessed?.Invoke(eventLogs);
+        }
 
         #endregion
 
