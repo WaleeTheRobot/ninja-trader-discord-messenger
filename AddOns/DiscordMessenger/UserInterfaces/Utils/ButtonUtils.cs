@@ -1,45 +1,34 @@
-﻿using System;
+﻿using NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Configs;
+using NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Models;
+using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
 
-namespace NinjaTrader.Custom.AddOns.DiscordMessenger
+namespace NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Utils
 {
-    public class ButtonConfig
-    {
-        public string Content { get; set; }
-        public string ToggledContent { get; set; }
-        public string BackgroundColor { get; set; }
-        public string HoverBackgroundColor { get; set; }
-        public string ToggledBackgroundColor { get; set; }
-        public string TextColor { get; set; }
-        public Delegate ClickHandler { get; set; }
-        public bool IsToggleable { get; set; }
-        public bool InitialToggleState { get; set; }
-    }
-
     public class ButtonState
     {
         public bool IsToggled { get; set; }
-        public ButtonConfig Config { get; set; }
+        public ButtonModel Config { get; set; }
     }
 
     public static class ButtonUtils
     {
-        public static Button GetButton(ButtonConfig config)
+        public static Button GetButton(ButtonModel config)
         {
             Button button = new Button
             {
                 Content = config.IsToggleable && config.InitialToggleState ? config.ToggledContent : config.Content,
                 FontSize = 16,
                 Visibility = Visibility.Visible,
-                Foreground = Utils.GetSolidColorBrushFromHex(config.TextColor),
+                Foreground = UserInterfaceUtils.GetSolidColorBrushFromHex(config.TextColor),
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch,
                 Tag = new ButtonState { IsToggled = config.IsToggleable && config.InitialToggleState, Config = config },
-                Background = Utils.GetSolidColorBrushFromHex(config.BackgroundColor),
+                Background = UserInterfaceUtils.GetSolidColorBrushFromHex(config.BackgroundColor),
                 BorderBrush = Brushes.Transparent,
                 BorderThickness = new Thickness(0),
                 Padding = new Thickness(3),
@@ -69,7 +58,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
             }
 
             button.IsEnabledChanged += (sender, e) => UpdateButtonState(button, button.IsEnabled);
-            button.MouseEnter += (sender, e) => button.Background = Utils.GetSolidColorBrushFromHex(config.HoverBackgroundColor);
+            button.MouseEnter += (sender, e) => button.Background = UserInterfaceUtils.GetSolidColorBrushFromHex(config.HoverBackgroundColor);
             button.MouseLeave += (sender, e) => UpdateButtonState(button, button.IsEnabled);
 
             UpdateButtonState(button, false);
@@ -83,30 +72,30 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
 
             var config = ((ButtonState)button.Tag).Config;
 
-            style.Setters.Add(new Setter(Button.TemplateProperty, CreateButtonTemplate()));
+            style.Setters.Add(new Setter(Control.TemplateProperty, CreateButtonTemplate()));
 
             style.Triggers.Add(new Trigger
             {
-                Property = Button.IsMouseOverProperty,
+                Property = UIElement.IsMouseOverProperty,
                 Value = true,
-                Setters = { new Setter(Button.BackgroundProperty, Utils.GetSolidColorBrushFromHex(config.HoverBackgroundColor)) }
+                Setters = { new Setter(Control.BackgroundProperty, UserInterfaceUtils.GetSolidColorBrushFromHex(config.HoverBackgroundColor)) }
             });
 
             style.Triggers.Add(new Trigger
             {
-                Property = Button.IsPressedProperty,
+                Property = System.Windows.Controls.Primitives.ButtonBase.IsPressedProperty,
                 Value = true,
-                Setters = { new Setter(Button.BackgroundProperty, Utils.GetSolidColorBrushFromHex(config.HoverBackgroundColor)) }
+                Setters = { new Setter(Control.BackgroundProperty, UserInterfaceUtils.GetSolidColorBrushFromHex(config.HoverBackgroundColor)) }
             });
 
             style.Triggers.Add(new Trigger
             {
-                Property = Button.IsEnabledProperty,
+                Property = UIElement.IsEnabledProperty,
                 Value = false,
                 Setters =
                 {
-                    new Setter(Button.BackgroundProperty, Utils.GetSolidColorBrushFromHex(Colors.ButtonDisabledBgColor)),
-                    new Setter(Button.OpacityProperty, 0.5)
+                    new Setter(Control.BackgroundProperty, UserInterfaceUtils.GetSolidColorBrushFromHex(CustomColors.BUTTON_DISABLED_BG_COLOR)),
+                    new Setter(UIElement.OpacityProperty, 0.5)
                 }
             });
 
@@ -124,8 +113,8 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
             border.SetBinding(Border.PaddingProperty, new Binding("Padding") { RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent) });
 
             FrameworkElementFactory contentPresenter = new FrameworkElementFactory(typeof(ContentPresenter));
-            contentPresenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-            contentPresenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            contentPresenter.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            contentPresenter.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
             border.AppendChild(contentPresenter);
 
             template.VisualTree = border;
@@ -143,12 +132,12 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
                 if (config.IsToggleable)
                 {
                     // Toggled is enabling
-                    button.Background = Utils.GetSolidColorBrushFromHex(state.IsToggled ? config.BackgroundColor : config.ToggledBackgroundColor);
+                    button.Background = UserInterfaceUtils.GetSolidColorBrushFromHex(state.IsToggled ? config.BackgroundColor : config.ToggledBackgroundColor);
                     button.Content = state.IsToggled && config.IsToggleable ? config.ToggledContent : config.Content;
                 }
                 else
                 {
-                    button.Background = Utils.GetSolidColorBrushFromHex(config.BackgroundColor);
+                    button.Background = UserInterfaceUtils.GetSolidColorBrushFromHex(config.BackgroundColor);
                     button.Content = state.IsToggled && config.IsToggleable ? config.ToggledContent : config.Content;
                 }
 
@@ -157,7 +146,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
             }
             else
             {
-                button.Background = Utils.GetSolidColorBrushFromHex(Colors.ButtonDisabledBgColor);
+                button.Background = UserInterfaceUtils.GetSolidColorBrushFromHex(CustomColors.BUTTON_DISABLED_BG_COLOR);
                 button.Opacity = 0.5;
             }
 

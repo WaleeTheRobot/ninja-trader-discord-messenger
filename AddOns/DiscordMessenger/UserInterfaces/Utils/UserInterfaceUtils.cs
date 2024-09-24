@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Windows.Media;
 
-namespace NinjaTrader.Custom.AddOns.DiscordMessenger
+namespace NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Utils
 {
-    public static class Utils
+    public static class UserInterfaceUtils
     {
         public static SolidColorBrush GetSolidColorBrushFromHex(string hexColor)
         {
