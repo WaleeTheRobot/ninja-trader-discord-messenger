@@ -91,15 +91,12 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Components
 
         private void HandleTradingStatusButtonClick(object sender, RoutedEventArgs e)
         {
-            Button button = (Button)sender;
-            ButtonState state = (ButtonState)button.Tag;
-
-            // _tradingStatusDisabled = !state.IsToggled;
+            _eventManager.UpdateOrderEntry();
         }
 
         private void HandleScreenshotButtonClick(object sender, RoutedEventArgs e)
         {
-            _eventManager.TakeScreenshot(ProcessType.Manual, $"{DateTime.Now:yyyyMMddHHmmss}.png");
+            _eventManager.TakeScreenshot(ProcessType.Manual);
         }
     }
 }

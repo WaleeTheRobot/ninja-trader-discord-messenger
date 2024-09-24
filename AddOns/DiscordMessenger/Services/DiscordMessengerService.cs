@@ -62,7 +62,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
             {
                 // We want the chart to update the orders prior to the screenshot
                 await Task.Delay(1000);
-                _eventManager.TakeScreenshot(ProcessType.Auto, $"{DateTime.Now:yyyyMMddHHmmss}.png");
+                _eventManager.TakeScreenshot(ProcessType.Auto);
             });
         }
 
@@ -113,10 +113,14 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
                         formData.Add(jsonContent, "payload_json");
                     }
 
-                    var fileStream = new FileStream(_screenshotPath, FileMode.Open, FileAccess.Read);
+                    // Reassign here in case user quickly creates multiple screenshots
+                    // Sometimes the files wont delete if its too fast
+                    var screenshotPath = _screenshotPath;
+
+                    var fileStream = new FileStream(screenshotPath, FileMode.Open, FileAccess.Read);
                     var fileContent = new StreamContent(fileStream);
                     fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-                    formData.Add(fileContent, "file", Path.GetFileName(_screenshotPath));
+                    formData.Add(fileContent, "file", Path.GetFileName(screenshotPath));
 
                     HttpResponseMessage response = await _httpClient.PostAsync(_webhookUrls[0], formData);
 
@@ -124,7 +128,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
                     {
                         try
                         {
-                            File.Delete(_screenshotPath);
+                            File.Delete(screenshotPath);
                             callback(true, "Screenshot sent and file deleted successfully.");
                         }
                         catch (Exception deleteEx)
@@ -134,6 +138,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
                     }
                     else
                     {
+                        File.Delete(screenshotPath);
                         callback(false, $"Failed to send screenshot. Status code: {response.StatusCode}");
                     }
                 }
@@ -147,16 +152,16 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
         private async Task HandleOnScreenshotProcessed(ProcessType processType, string screenshotName)
         {
             string filePath = Path.Combine(_screenshotLocation, screenshotName);
+            _screenshotPath = filePath;
 
             if (processType == ProcessType.Auto)
             {
-                _screenshotPath = filePath;
                 _eventManager.AutoScreenshotProcessedWaiting();
             }
             else
             {
                 // Send the screenshot asynchronously and handle the callback
-                await SendScreenshotAsync(filePath, (success, message) =>
+                await SendScreenshotAsync((success, message) =>
                 {
                     if (success)
                     {
@@ -170,10 +175,10 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
             }
         }
 
-        private async Task SendScreenshotAsync(string filePath, Action<bool, string> callback)
+        private async Task SendScreenshotAsync(Action<bool, string> callback)
         {
             // Ensure the file exists before sending
-            if (!await EnsureFileExists(filePath))
+            if (!await EnsureFileExists())
             {
                 callback(false, "Failed to send screenshot. File not found after retries.");
                 return;
@@ -183,11 +188,11 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
             await SendHttpRequestAsync(null, callback);
         }
 
-        private async Task<bool> EnsureFileExists(string filePath, int retryCount = 5, int delayMilliseconds = 500)
+        private async Task<bool> EnsureFileExists(int retryCount = 5, int delayMilliseconds = 500)
         {
             for (int i = 0; i < retryCount; i++)
             {
-                if (File.Exists(filePath))
+                if (File.Exists(_screenshotPath))
                 {
                     return true;
                 }

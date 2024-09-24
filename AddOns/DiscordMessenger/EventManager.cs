@@ -24,7 +24,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
         public event Action<Status> OnUpdateStatus;
         public event Action<EventLog> OnUpdateEventLog;
         public event Action<bool> OnAutoButtonClicked;
-        public event Func<ProcessType, string, Task> OnTakeScreenshot;
+        public event Func<ProcessType, Task> OnTakeScreenshot;
         public event Func<ProcessType, string, Task> OnScreenshotProcessed;
         public event Action OnAutoScreenshotProcessedWaiting;
 
@@ -87,9 +87,9 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger
             OnAutoButtonClicked?.Invoke(isEnabled);
         }
 
-        public void TakeScreenshot(ProcessType processType, string screenshotName)
+        public void TakeScreenshot(ProcessType processType)
         {
-            OnTakeScreenshot?.Invoke(processType, screenshotName);
+            OnTakeScreenshot?.Invoke(processType);
         }
 
         public void ScreenshotProcessed(ProcessType processType, string screenshotName)

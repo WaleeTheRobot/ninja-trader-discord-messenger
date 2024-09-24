@@ -94,13 +94,15 @@ namespace NinjaTrader.NinjaScript.Indicators
             _chartWindow.MainTabControl.SelectionChanged += TabChangedHandler;
         }
 
-        private async Task HandleScreenshot(ProcessType processType, string screenshotName)
+        private async Task HandleScreenshot(ProcessType processType)
         {
-            await TakeScreenshot(processType, screenshotName);
+            await TakeScreenshot(processType);
         }
 
-        private async Task TakeScreenshot(ProcessType processType, string screenshotName)
+        private async Task TakeScreenshot(ProcessType processType)
         {
+            string screenshotName = $"{DateTime.Now:yyyyMMddHHmmssfff}.png";
+
             await Dispatcher.InvokeAsync(() =>
             {
                 try

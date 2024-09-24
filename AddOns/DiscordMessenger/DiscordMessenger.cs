@@ -170,10 +170,13 @@ namespace NinjaTrader.NinjaScript.Indicators
 
         private void SetConfig(Account account)
         {
+            // Ensure there's no trailing slash in the screenshot location
+            string trimmedScreenshotLocation = ScreenshotLocation.TrimEnd('\\');
+
             Config.Instance.WebhookUrls = GetWebhookUrls();
             Config.Instance.Account = account;
             Config.Instance.AccountName = AccountName;
-            Config.Instance.ScreenshotLocation = ScreenshotLocation;
+            Config.Instance.ScreenshotLocation = trimmedScreenshotLocation;
             Config.Instance.EmbededColor = EmbededColor;
         }
 
