@@ -1,6 +1,6 @@
 # NinjaTrader Discord Messenger
 
-<img src="./images/screenshot.png" alt="Screenshot" style="display: block; margin: 0 auto">
+<img src="./images/screenshot-v2.png" alt="Screenshot" style="display: block; margin: 0 auto">
 
 Share your trades with a discord server. The Discord Messenger automatically takes a screenshot of the chart and sends the account position and active orders to a Discord webhook url everytime an order or position is updated.
 

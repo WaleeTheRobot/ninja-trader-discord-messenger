@@ -4,6 +4,7 @@ using NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Configs;
 using NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Models;
 using NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Utils;
 using System;
+using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -15,12 +16,23 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Components
         private TradingStatusEvents _tradingStatusEvents;
         private Button _autoButton, _tradingStatusButton, _screenshotButton;
 
+        private Timer _tradingStatusDebounceTimer;
+        private Timer _screenshotDebounceTimer;
+
         public ButtonsGrid(ControlPanelEvents controlPanelEvents, TradingStatusEvents tradingStatusEvents)
         {
             _controlPanelEvents = controlPanelEvents;
             _controlPanelEvents.OnUpdateStatus += HandleUpdateStatus;
 
             _tradingStatusEvents = tradingStatusEvents;
+
+            _tradingStatusDebounceTimer = new Timer(300);
+            _tradingStatusDebounceTimer.Elapsed += OnTradingStatusDebounceElapsed;
+            _tradingStatusDebounceTimer.AutoReset = false;
+
+            _screenshotDebounceTimer = new Timer(300);
+            _screenshotDebounceTimer.Elapsed += OnScreenshotDebounceElapsed;
+            _screenshotDebounceTimer.AutoReset = false;
 
             InitializeComponent();
         }
@@ -97,10 +109,21 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Components
 
         private void HandleTradingStatusButtonClick(object sender, RoutedEventArgs e)
         {
-            _tradingStatusEvents.ManualUpdateOrderEntry();
+            _tradingStatusDebounceTimer.Stop();
+            _tradingStatusDebounceTimer.Start();
         }
 
         private void HandleScreenshotButtonClick(object sender, RoutedEventArgs e)
+        {
+            _screenshotDebounceTimer.Stop();
+            _screenshotDebounceTimer.Start();
+        }
+
+        private void OnTradingStatusDebounceElapsed(object sender, ElapsedEventArgs e)
+        {
+            _tradingStatusEvents.ManualUpdateOrderEntry();
+        }
+        private void OnScreenshotDebounceElapsed(object sender, ElapsedEventArgs e)
         {
             _ = _controlPanelEvents.TakeScreenshot(ProcessType.Manual);
         }

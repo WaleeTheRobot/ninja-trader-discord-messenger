@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using System.Timers;
 using System.Windows.Media;
 using System.Xml.Serialization;
 #endregion
@@ -21,6 +22,7 @@ namespace NinjaTrader.NinjaScript.Indicators
         private Brush _embededColor;
         private bool _autoSend;
         private bool _orderUpdateTriggered;
+        private Timer _debounceTimer;
 
         private EventManager _eventManager;
         private ControlPanelEvents _controlPanelEvents;
@@ -98,6 +100,10 @@ namespace NinjaTrader.NinjaScript.Indicators
                 _autoSend = true;
                 _orderUpdateTriggered = false;
 
+                _debounceTimer = new Timer(300);
+                _debounceTimer.Elapsed += OnDebounceElapsed;
+                _debounceTimer.AutoReset = false;
+
                 Account account = Account.All.FirstOrDefault(a => a.Name == AccountName);
 
                 if (account != null)
@@ -166,7 +172,8 @@ namespace NinjaTrader.NinjaScript.Indicators
         {
             if (_autoSend)
             {
-                _orderUpdateTriggered = true;
+                _debounceTimer.Stop();
+                _debounceTimer.Start();
             }
         }
 
@@ -182,6 +189,11 @@ namespace NinjaTrader.NinjaScript.Indicators
                 _orderUpdateTriggered = false;
                 _tradingStatusEvents.UpdateOrderEntry();
             }
+        }
+
+        private void OnDebounceElapsed(object sender, ElapsedEventArgs e)
+        {
+            _orderUpdateTriggered = true;
         }
 
         private void SetConfig(Account account)
