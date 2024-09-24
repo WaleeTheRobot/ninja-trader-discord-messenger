@@ -41,6 +41,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Components
                 TextColor = CustomColors.TEXT_COLOR,
                 ClickHandler = (Action<object, RoutedEventArgs>)HandleAutoButtonClick,
                 IsToggleable = true,
+                // True is enabled
                 InitialToggleState = true
             });
 
@@ -91,12 +92,12 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Components
             Button button = (Button)sender;
             ButtonState state = (ButtonState)button.Tag;
 
-            _controlPanelEvents.AutoButtonClicked(!state.IsToggled);
+            _controlPanelEvents.AutoButtonClicked(state.IsToggled);
         }
 
         private void HandleTradingStatusButtonClick(object sender, RoutedEventArgs e)
         {
-            _tradingStatusEvents.UpdateOrderEntry();
+            _tradingStatusEvents.ManualUpdateOrderEntry();
         }
 
         private void HandleScreenshotButtonClick(object sender, RoutedEventArgs e)

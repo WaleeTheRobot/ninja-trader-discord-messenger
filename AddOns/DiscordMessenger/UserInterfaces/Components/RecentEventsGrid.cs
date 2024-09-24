@@ -52,7 +52,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.UserInterfaces.Components
                 VerticalAlignment = VerticalAlignment.Top,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Margin = new Thickness(0, 4, 0, 0),
-                Height = 100, // You can adjust the height as needed
+                Height = 100,
                 VerticalContentAlignment = VerticalAlignment.Top,
                 Padding = new Thickness(5),
                 BorderThickness = new Thickness(0),

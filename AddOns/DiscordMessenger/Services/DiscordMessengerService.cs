@@ -18,6 +18,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
 {
     public class DiscordMessengerService
     {
+        private readonly EventManager _eventManager;
         private readonly EventLoggingEvents _eventLoggingEvents;
         private readonly TradingStatusEvents _tradingStatusEvents;
         private readonly ControlPanelEvents _controlPanelEvents;
@@ -35,11 +36,14 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
         private Type _jsonConvertType;
 
         public DiscordMessengerService(
+            EventManager eventManager,
             EventLoggingEvents eventLoggingEvents,
             TradingStatusEvents tradingStatusEvents,
             ControlPanelEvents controlPanelEvents
             )
         {
+            _eventManager = eventManager;
+
             _eventLoggingEvents = eventLoggingEvents;
 
             _tradingStatusEvents = tradingStatusEvents;
@@ -75,7 +79,7 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
             Task.Run(async () =>
             {
                 // We want the chart to update the orders prior to the screenshot
-                await Task.Delay(1000);
+                await Task.Delay(500);
                 _ = _controlPanelEvents.TakeScreenshot(ProcessType.Auto);
             });
         }
@@ -100,6 +104,8 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
                         Status = Status.Failed,
                         Message = "Trading Status Sent"
                     });
+
+                    _eventManager.PrintMessage(message);
                 }
 
                 _screenshotPath = "";
@@ -124,43 +130,48 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
         {
             try
             {
-                using (var formData = new MultipartFormDataContent())
+                var screenshotPath = _screenshotPath;
+
+                foreach (var url in _webhookUrls)
                 {
-                    if (!string.IsNullOrEmpty(jsonPayload))
+                    using (var formData = new MultipartFormDataContent())
                     {
-                        var jsonContent = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-                        formData.Add(jsonContent, "payload_json");
-                    }
-
-                    // Reassign here in case user quickly creates multiple screenshots
-                    // Sometimes the files wont delete if its too fast
-                    var screenshotPath = _screenshotPath;
-
-                    var fileStream = new FileStream(screenshotPath, FileMode.Open, FileAccess.Read);
-                    var fileContent = new StreamContent(fileStream);
-                    fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-                    formData.Add(fileContent, "file", Path.GetFileName(screenshotPath));
-
-                    HttpResponseMessage response = await _httpClient.PostAsync(_webhookUrls[0], formData);
-
-                    if (response.IsSuccessStatusCode)
-                    {
-                        try
+                        if (!string.IsNullOrEmpty(jsonPayload))
                         {
-                            File.Delete(screenshotPath);
-                            callback(true, "Screenshot sent and file deleted successfully.");
+                            var jsonContent = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+                            formData.Add(jsonContent, "payload_json");
                         }
-                        catch (Exception deleteEx)
+
+                        using (var fileStream = new FileStream(screenshotPath, FileMode.Open, FileAccess.Read))
                         {
-                            callback(true, $"Screenshot sent successfully, but failed to delete file: {deleteEx.Message}");
+                            using (var fileContent = new StreamContent(fileStream))
+                            {
+                                fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                                formData.Add(fileContent, "file", Path.GetFileName(screenshotPath));
+
+                                var response = await _httpClient.PostAsync(url, formData);
+
+                                if (response.IsSuccessStatusCode)
+                                {
+                                    try
+                                    {
+                                        callback(true, "Screenshot sent successfully.");
+                                    }
+                                    catch (Exception deleteEx)
+                                    {
+                                        callback(true, $"Screenshot sent successfully, but failed to delete file: {deleteEx.Message}");
+                                    }
+                                }
+                                else
+                                {
+                                    callback(false, $"Failed to send screenshot. Status code: {response.StatusCode}");
+                                }
+                            }
                         }
-                    }
-                    else
-                    {
-                        File.Delete(screenshotPath);
-                        callback(false, $"Failed to send screenshot. Status code: {response.StatusCode}");
                     }
                 }
+
+                File.Delete(screenshotPath);
             }
             catch (Exception ex)
             {
@@ -197,6 +208,8 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
                             Status = Status.Failed,
                             Message = "Screenshot Sent"
                         });
+
+                        _eventManager.PrintMessage(message);
                     }
                 });
             }
@@ -211,7 +224,6 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
                 return;
             }
 
-            // Send the screenshot via HTTP request
             await SendHttpRequestAsync(null, callback);
         }
 

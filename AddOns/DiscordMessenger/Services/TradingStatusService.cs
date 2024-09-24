@@ -19,12 +19,30 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
         public TradingStatusService(TradingStatusEvents tradingStatusEvents)
         {
             _tradingStatusEvents = tradingStatusEvents;
-            _tradingStatusEvents.OnOrderEntryUpdated += HandleOrderEntryUpdated;
+            _tradingStatusEvents.OnManualOrderEntryUpdate += HandleOrderEntryUpdated;
+            _tradingStatusEvents.OnOrderEntryUpdated += HandleManualOrderEntryUpdated;
+            _tradingStatusEvents.OnOrderEntryUpdatedSubscribe += HandleOnOrderEntryUpdatedSubscribe;
+            _tradingStatusEvents.OnOrderEntryUpdatedUnsubscribe += HandleOnOrderEntryUpdatedUnsubscribe;
 
             _account = Config.Instance.Account;
 
             _positions = new List<Position>();
             _orderEntries = new List<OrderEntry>();
+        }
+
+        private void HandleOnOrderEntryUpdatedSubscribe()
+        {
+            _tradingStatusEvents.OnOrderEntryUpdated += HandleOrderEntryUpdated;
+        }
+
+        private void HandleOnOrderEntryUpdatedUnsubscribe()
+        {
+            _tradingStatusEvents.OnOrderEntryUpdated -= HandleOrderEntryUpdated;
+        }
+
+        private void HandleManualOrderEntryUpdated()
+        {
+            HandleOrderEntryUpdated();
         }
 
         private void HandlePositionUpdated()
@@ -56,12 +74,6 @@ namespace NinjaTrader.Custom.AddOns.DiscordMessenger.Services
         {
             int totalOrders = _account.Orders.Count;
             _orderEntries = new List<OrderEntry>();
-
-            // No active orders
-            if (totalOrders == 0)
-            {
-                return;
-            }
 
             for (int i = 0; i < totalOrders; i++)
             {

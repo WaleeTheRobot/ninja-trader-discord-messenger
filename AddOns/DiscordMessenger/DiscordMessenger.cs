@@ -89,7 +89,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 
                 // Properties
                 WebhookUrls = "";
-                AccountName = "Playback101";
+                AccountName = "Sim101";
                 ScreenshotLocation = "C:\\screenshots";
                 EmbededColor = Brushes.DodgerBlue;
             }
@@ -122,10 +122,10 @@ namespace NinjaTrader.NinjaScript.Indicators
                     _eventLoggingEvents = new EventLoggingEvents(_eventManager);
 
                     // Initialize Services
-                    new WebhookCheckerService(_webhookCheckerEvents);
+                    new WebhookCheckerService(_eventManager, _webhookCheckerEvents, _eventLoggingEvents);
                     new TradingStatusService(_tradingStatusEvents);
                     new EventLoggingService(_eventLoggingEvents);
-                    new DiscordMessengerService(_eventLoggingEvents, _tradingStatusEvents, _controlPanelEvents);
+                    new DiscordMessengerService(_eventManager, _eventLoggingEvents, _tradingStatusEvents, _controlPanelEvents);
                 }
                 else
                 {
@@ -164,7 +164,10 @@ namespace NinjaTrader.NinjaScript.Indicators
 
         private void OnOrderUpdate(object sender, OrderEventArgs e)
         {
-            _orderUpdateTriggered = true;
+            if (_autoSend)
+            {
+                _orderUpdateTriggered = true;
+            }
         }
 
         protected override void OnBarUpdate()
@@ -203,6 +206,16 @@ namespace NinjaTrader.NinjaScript.Indicators
         private void HandleAutoButtonClicked(bool isEnabled)
         {
             _autoSend = isEnabled;
+
+            // We don't want a message to be sent when switching from disabled to enabled
+            if (isEnabled)
+            {
+                _tradingStatusEvents.OrderEntryUpdatedSubscribe();
+            }
+            else
+            {
+                _tradingStatusEvents.OrderEntryUpdatedUnsubscribe();
+            }
         }
 
         // Used for debugging event messages
