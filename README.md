@@ -41,7 +41,7 @@ This checks the status of the webhook every minute. Green indicates that it can 
 #### Adding multiple webhook urls
 
 You'll need to add them without any line breaks for the multiple webhook urls to work. Otherwise NinjaTrader will truncate them when you add them into the field. Example:
-https://discord.com/api/webhooks/1287216115734548614/RovsK5e, https://discord.com/api/webhooks/1287507140319379690/gCC8HS, https://discord.com/api/webhooks/1288143475031674901/0ttaQq80, https://discord.com/api/webhooks/1288143558141935751/gZnm4_o3i7Zm, https://discord.com/api/webhooks/1288143628329287782/testsdrfwer
+https://discord.com/api/webhooks/1287216115734548614/RovsK5e,https://discord.com/api/webhooks/1287507140319379690/gCC8HS,https://discord.com/api/webhooks/1288143475031674901/0ttaQq80,https://discord.com/api/webhooks/1288143558141935751/gZnm4_o3i7Zm,https://discord.com/api/webhooks/1288143628329287782/testsdrfwer
 
 ### Auto Send Button
 
