@@ -67,4 +67,4 @@ Screenshot displayed with the positions and active orders. Note that the active 
 
 <img src="./images/multiple-instruments.png" alt="Multiple Instruments" style="display: block; margin: 0 auto">
 
-Multiple instruments are grouped together.
+Multiple instruments are grouped together. This can look confusing. Probably should stick to just the one instrument for now.
